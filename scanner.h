@@ -37,6 +37,7 @@ enum token_t {
         AND,
         OR,
         IF,
+        ELSE,
         WHILE,
         FOR,
         RETURN,

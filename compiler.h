@@ -68,6 +68,9 @@ class Compiler {
         void parse_block ();
         void parse_expression ();
 
+        void push_block_scope();
+        void pop_block_scope();
+
         Parser get_binary_parser (enum token_t t);
         Parser get_unary_parser (enum token_t t);
 
@@ -82,7 +85,6 @@ class Compiler {
         void parse_products ();
         void parse_comparison ();
         void parse_logical ();
-        void parse_assignment ();
 };
 
 #endif

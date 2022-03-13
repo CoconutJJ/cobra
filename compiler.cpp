@@ -100,7 +100,6 @@ void Compiler::parse_primary ()
                         this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
                 } else if (this->match (MINUS_EQUAL)) {
-
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (PLUS_EQUAL));
                         this->bytecode->emit_op (OPNEG);
                         this->bytecode->write_uint32 (local_size);
@@ -135,7 +134,6 @@ void Compiler::parse_primary ()
                 }
 
         } else if (this->match (INT) || this->match (FLOAT) || this->match (DOUBLE)) {
-                
         } else if (this->match (LPAREN)) {
                 this->parse_precedence (PREC_ASSIGNMENT);
                 this->match (RPAREN);
@@ -155,20 +153,6 @@ void Compiler::parse_precedence (enum Precedence prec)
                 Parser binary_parser = this->get_binary_parser (binary);
                 PARSER_FN (binary_parser) ();
         }
-}
-
-void Compiler::parse_assignment ()
-{
-        if (!this->match (EQUAL)) {
-                this->parse_error ("expected '=' after lvalue");
-                return;
-        }
-
-        this->parse_precedence (PRECEDENCE_GREATER_THAN (EQUAL));
-
-        /**
-         * emit assignment op.
-         */
 }
 
 void Compiler::parse_logical ()
@@ -216,10 +200,11 @@ void Compiler::parse_error (char *error, ...)
 void Compiler::parse_block ()
 {
         this->consume (LBRACE, "expected '{' after ");
-
+        this->push_block_scope ();
         while (!this->match (RBRACE)) {
                 this->parse_statement ();
         }
+        this->pop_block_scope ();
 }
 
 void Compiler::parse_comparison ()
@@ -259,4 +244,68 @@ void Compiler::parse_terms ()
                 break;
         default: break;
         }
+}
+
+void Compiler::push_block_scope ()
+{
+        this->symbols = this->symbols->new_scope ();
+}
+
+void Compiler::pop_block_scope ()
+{
+        long offset = this->symbols->local_offset;
+        this->bytecode->emit_op (OPPOP);
+        this->bytecode->write_uint32 (offset);
+        this->symbols = this->symbols->pop_scope ();
+}
+
+void Compiler::parse_condition ()
+{
+        if (!this->match (IF)) {
+                this->parse_error ("expected if statement");
+                return;
+        }
+
+        this->consume (LPAREN, "expected '(' after if keyword");
+
+        this->parse_expression ();
+
+        this->consume (RPAREN, "expected ')' after if condition");
+
+        size_t offset_false = this->bytecode->emit_jump_false ();
+
+        this->parse_statement ();
+
+        size_t offset_true = this->bytecode->emit_jump ();
+
+        this->bytecode->patch_jump (offset_false);
+
+        if (this->match (ELSE)) {
+                this->parse_statement ();
+        }
+
+        this->bytecode->patch_jump (offset_true);
+}
+
+void Compiler::parse_while ()
+{
+        if (!this->match (WHILE)) {
+                this->parse_error ("expected while statement");
+                return;
+        }
+        this->consume (LPAREN, "expected '(' after while keyword");
+
+        size_t start_offset = this->bytecode->address ();
+
+        this->parse_expression ();
+
+        this->consume (RPAREN, "expected ')' after while condition");
+
+        size_t offset_false = this->bytecode->emit_jump_false ();
+
+        this->parse_statement ();
+
+        this->bytecode->emit_jump (start_offset);
+
+        this->bytecode->patch_jump (offset_false);
 }

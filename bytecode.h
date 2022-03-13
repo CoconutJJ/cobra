@@ -18,7 +18,7 @@ enum OpCode {
     OPAND,
     OPOR,
     OPJMP,
-    OPJMPTRUE,
+    OPJMPFALSE,
     OPSTORE,
     OPLOAD,
     OPPUSH,
@@ -34,7 +34,9 @@ class Bytecode {
         Bytecode();
         void emit_op(enum OpCode op);
         void patch_jump(size_t offset);
-        size_t emit_jump();
+        size_t emit_jump(uint32_t address = 0xFFFFFFFF);
+        size_t emit_jump_false();
+        size_t address();
         size_t write_uint8(uint8_t sh);
         size_t write_uint16(uint16_t sh);
         size_t write_uint32(uint32_t sh);
