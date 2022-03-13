@@ -47,7 +47,8 @@ enum token_t {
         FLOAT,
         DOUBLE,
         STRING,
-        IDENTIFIER
+        IDENTIFIER,
+        END
 };
 struct token {
         char *name;
@@ -68,6 +69,7 @@ class Scanner {
         struct token scan_token ();
         int line_no;
         int col_no;
+
     private:
         char *source;
         char *curr;
@@ -75,14 +77,13 @@ class Scanner {
         bool at_end ();
         char peek ();
         void advance ();
-        void skip_comment();
-        bool is_alpha(char c);
-        bool is_numeric(char c);
-        bool is_valid_identifier_char(char c);
-        enum token_t match_keyword(char *keyword, int length);
-        struct token match_identifier();
-        struct token match_number();
+        void skip_comment ();
+        bool is_alpha (char c);
+        bool is_numeric (char c);
+        bool is_valid_identifier_char (char c);
+        enum token_t match_keyword (char *keyword, int length);
+        struct token match_identifier ();
+        struct token match_number ();
         struct token make_token (enum token_t);
-
 };
 #endif

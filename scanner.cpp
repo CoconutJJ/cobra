@@ -1,7 +1,8 @@
 #include "scanner.h"
 #include "string.h"
 
-Scanner::Scanner(char * src_code) {
+Scanner::Scanner (char *src_code)
+{
         this->source = src_code;
 }
 
@@ -63,7 +64,7 @@ enum token_t Scanner::match_keyword (char *keyword, int length)
                 return RETURN;
         if (strncmp (keyword, "func", length) == 0)
                 return FUNC;
-                
+
         return IDENTIFIER;
 }
 
@@ -89,13 +90,13 @@ struct token Scanner::match_number ()
 
         struct token t;
 
-        while (this->is_numeric (this->peek ()) && !this->at_end()) {
+        while (this->is_numeric (this->peek ()) && !this->at_end ()) {
                 this->advance ();
         }
 
         if (this->match ('.')) {
                 t.type = DOUBLE;
-                while (this->is_numeric (this->peek ()) && !this->at_end()) {
+                while (this->is_numeric (this->peek ()) && !this->at_end ()) {
                         this->advance ();
                 }
 
@@ -113,6 +114,9 @@ struct token Scanner::scan_token ()
         struct token t;
 
         for (;;) {
+                if (this->at_end ())
+                        return (struct token){ .type = END };
+
                 char c = this->peek ();
                 this->advance ();
                 t.line = this->line_no;

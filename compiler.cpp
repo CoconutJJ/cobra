@@ -6,16 +6,42 @@
 
 Compiler::Compiler (char *src_code)
 {
-#define RULE(token, binary, bprec, unary, uprec)                                                                       \
-        this->rules[token] = {                                                                                         \
-                .binary_parser = (binary),                                                                             \
-                .unary_parser = (unary),                                                                               \
-                .binary_prec = (bprec),                                                                                \
-                .unary_prec = (uprec)                                                                                  \
-        }
-
         this->scanner = new Scanner (src_code);
         this->bytecode = new Bytecode ();
+        this->setup_rules ();
+}
+
+Compiler::Compiler (FILE *source_fp)
+{
+        size_t capacity = 8;
+        size_t read_size = 8;
+
+        char *source_buf = (char *)malloc (capacity * sizeof (char));
+        if (!source_buf)
+                throw -1;
+
+        char *curr = source_buf;
+
+        while (fread (curr, 1, read_size, source_fp) == read_size) {
+                curr = source_buf + capacity;
+
+                read_size = capacity;
+
+                capacity *= 2;
+
+                source_buf = (char *)realloc (source_buf, capacity * sizeof (char));
+
+                if (!source_buf)
+                        throw -1;
+        }
+}
+
+bool Compiler::setup_rules ()
+{
+#define RULE(token, binary, bprec, unary, uprec)                                                                       \
+        this->rules[token] = {                                                                                         \
+                .binary_parser = (binary), .unary_parser = (unary), .binary_prec = (bprec), .unary_prec = (uprec)      \
+        }
         RULE (PLUS, &Compiler::parse_terms, PREC_TERM, NULL, PREC_NONE);
         RULE (MINUS, &Compiler::parse_terms, PREC_TERM, &Compiler::parse_unary, PREC_UNARY);
         RULE (MULT, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_NONE);
@@ -60,12 +86,38 @@ void Compiler::advance ()
 
 enum token_t Compiler::peek ()
 {
-        return Compiler::curr_token.type;
+        return this->curr_token.type;
+}
+
+struct token Compiler::peek_token ()
+{
+        return this->curr_token;
+}
+
+enum token_t Compiler::previous ()
+{
+        return this->prev_token.type;
+}
+
+void Compiler::parse_statement ()
+{
+        switch (this->peek ()) {
+        case LBRACE: this->parse_block (); break;
+        case IDENTIFIER: this->parse_expression (); break;
+        case IF: this->parse_condition (); break;
+        case WHILE: this->parse_while (); break;
+        default: break;
+        }
+}
+
+void Compiler::parse_expression ()
+{
+        this->parse_precedence (PREC_ASSIGNMENT);
 }
 
 void Compiler::parse_primary ()
 {
-        struct token token = this->peekToken ();
+        struct token token = this->peek_token ();
 
         if (this->match (IDENTIFIER)) {
                 size_t local_size = this->symbols->get_local_size (token.name, token.len);
@@ -207,6 +259,16 @@ void Compiler::parse_block ()
         this->pop_block_scope ();
 }
 
+void Compiler::parse_unary ()
+{
+        enum token_t op = this->peek ();
+
+        if (this->match (MINUS)) {
+                this->parse_precedence (this->get_unary_precedence (MINUS));
+                this->bytecode->emit_op (OPNEG);
+        }
+}
+
 void Compiler::parse_comparison ()
 {
         enum token_t op = this->peek ();
@@ -223,6 +285,24 @@ void Compiler::parse_comparison ()
         case GTEQUAL: this->bytecode->emit_op (OPGTEQ); break;
         case LT: this->bytecode->emit_op (OPLT); break;
         case LTEQUAL: this->bytecode->emit_op (OPLTEQ); break;
+        default: break;
+        }
+}
+
+void Compiler::parse_products ()
+{
+        enum token_t op = this->peek ();
+
+        if (!this->match (MULT) && !this->match (DIV)) {
+                this->parse_error ("expected * or /");
+                return;
+        }
+
+        this->parse_precedence (PRECEDENCE_GREATER_THAN (op));
+
+        switch (op) {
+        case MULT: this->bytecode->emit_op (OPMULT); break;
+        case DIV: this->bytecode->emit_op (OPDIV); break;
         default: break;
         }
 }
@@ -308,4 +388,12 @@ void Compiler::parse_while ()
         this->bytecode->emit_jump (start_offset);
 
         this->bytecode->patch_jump (offset_false);
+}
+
+bool Compiler::compile ()
+{
+        while (!this->match (END)) {
+                this->parse_statement ();
+        }
+        return this->has_error;
 }

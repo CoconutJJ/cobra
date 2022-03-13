@@ -50,9 +50,11 @@ class Compiler {
 
         bool has_error;
 
+        bool setup_rules ();
+
         bool match (enum token_t t);
 
-        struct token peekToken();
+        struct token peek_token ();
 
         enum token_t peek ();
         enum token_t previous ();
@@ -68,8 +70,8 @@ class Compiler {
         void parse_block ();
         void parse_expression ();
 
-        void push_block_scope();
-        void pop_block_scope();
+        void push_block_scope ();
+        void pop_block_scope ();
 
         Parser get_binary_parser (enum token_t t);
         Parser get_unary_parser (enum token_t t);

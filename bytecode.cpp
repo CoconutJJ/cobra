@@ -67,7 +67,7 @@ void Bytecode::emit_op (enum OpCode op)
         this->write_uint8 (op & 0xFF);
 }
 
-size_t Bytecode::emit_jump (uint32_t address = 0xFFFFFFFF)
+size_t Bytecode::emit_jump (uint32_t address)
 {
         this->emit_op (OPJMP);
         return this->write_uint32 (address);
