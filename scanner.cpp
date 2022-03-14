@@ -1,9 +1,13 @@
 #include "scanner.h"
 #include "string.h"
-
+#include <stdarg.h>
+#include <stdio.h>
 Scanner::Scanner (char *src_code)
 {
         this->source = src_code;
+        this->curr = this->source;
+        this->line_no = 1;
+        this->col_no = 0;
 }
 
 void Scanner::advance ()
@@ -23,12 +27,21 @@ bool Scanner::match (char c)
 
 bool Scanner::at_end ()
 {
-        return *this->curr == '\0';
+        return *(this->curr) == '\0';
 }
 
 char Scanner::peek ()
 {
         return *this->curr;
+}
+
+void Scanner::scan_error (const char *message, ...)
+{
+        va_list args;
+        va_start(args, message);
+        fprintf(stderr, "[syntax error %d:%d] ", this->line_no, this->col_no);
+        vfprintf(stderr, message, args);
+        va_end(args);
 }
 
 void Scanner::skip_comment ()
@@ -82,6 +95,8 @@ struct token Scanner::match_identifier ()
         t.line = this->line_no;
         t.col = this->col_no;
         t.type = this->match_keyword (start, t.len);
+
+        return t;
 }
 
 struct token Scanner::match_number ()
@@ -158,6 +173,9 @@ struct token Scanner::scan_token ()
                                 return this->match_identifier ();
                         } else if (this->is_numeric (c)) {
                                 return this->match_number ();
+                        } else {
+                                this->scan_error("unknown symbol %c", c);
+                                exit(EXIT_FAILURE);
                         }
 
                         break;

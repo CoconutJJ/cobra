@@ -1,4 +1,5 @@
 #include "bytecode.h"
+#include <stdio.h>
 #include <stdlib.h>
 #define WRITE_INT(type, idx, val) *((type *)&this->chunk[idx]) = val
 Bytecode::Bytecode ()

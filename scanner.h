@@ -73,6 +73,7 @@ class Scanner {
     private:
         char *source;
         char *curr;
+        void scan_error(const char *message, ...);
         bool match (char c);
         bool at_end ();
         char peek ();

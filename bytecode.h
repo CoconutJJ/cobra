@@ -23,7 +23,8 @@ enum OpCode {
     OPLOAD,
     OPPUSH,
     OPPOP,
-    OPCALL
+    OPCALL,
+    OPHALT
 };
 
 class Bytecode {

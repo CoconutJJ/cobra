@@ -6,9 +6,7 @@
 
 Compiler::Compiler (char *src_code)
 {
-        this->scanner = new Scanner (src_code);
-        this->bytecode = new Bytecode ();
-        this->setup_rules ();
+        this->setup (src_code);
 }
 
 Compiler::Compiler (FILE *source_fp)
@@ -34,19 +32,32 @@ Compiler::Compiler (FILE *source_fp)
                 if (!source_buf)
                         throw -1;
         }
+
+        this->setup (source_buf);
 }
 
-bool Compiler::setup_rules ()
+void Compiler::setup (char * src_code)
 {
 #define RULE(token, binary, bprec, unary, uprec)                                                                       \
         this->rules[token] = {                                                                                         \
-                .binary_parser = (binary), .unary_parser = (unary), .binary_prec = (bprec), .unary_prec = (uprec)      \
+                .binary_parser = (binary),                                                                             \
+                .unary_parser = (unary),                                                                               \
+                .binary_prec = (bprec),                                                                                \
+                .unary_prec = (uprec)                                                                                  \
         }
+        this->has_error = false;
+        this->scanner = new Scanner (src_code);
+        this->bytecode = new Bytecode ();
+        this->advance ();
+
         RULE (PLUS, &Compiler::parse_terms, PREC_TERM, NULL, PREC_NONE);
         RULE (MINUS, &Compiler::parse_terms, PREC_TERM, &Compiler::parse_unary, PREC_UNARY);
         RULE (MULT, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_NONE);
         RULE (DIV, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_PRODUCT);
         RULE (LPAREN, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
+        RULE (INT, NULL, PREC_PRIMARY, &Compiler::parse_primary, PREC_PRIMARY);
+        RULE (FLOAT, NULL, PREC_NONE, &Compiler::parse_unary, PREC_PRIMARY);
+        RULE (END, NULL, PREC_NONE, NULL, PREC_NONE);
 }
 
 Parser Compiler::get_binary_parser (enum token_t t)
@@ -103,10 +114,9 @@ void Compiler::parse_statement ()
 {
         switch (this->peek ()) {
         case LBRACE: this->parse_block (); break;
-        case IDENTIFIER: this->parse_expression (); break;
         case IF: this->parse_condition (); break;
         case WHILE: this->parse_while (); break;
-        default: break;
+        default: this->parse_expression (); break;
         }
 }
 
@@ -228,7 +238,7 @@ void Compiler::parse_logical ()
         }
 }
 
-void Compiler::consume (enum token_t t, char *error_message, ...)
+void Compiler::consume (enum token_t t, const char *error_message, ...)
 {
         if (!this->match (t)) {
                 va_list args;
@@ -239,7 +249,7 @@ void Compiler::consume (enum token_t t, char *error_message, ...)
         }
 }
 
-void Compiler::parse_error (char *error, ...)
+void Compiler::parse_error (const char *error, ...)
 {
         this->has_error = true;
         va_list args;
@@ -261,8 +271,6 @@ void Compiler::parse_block ()
 
 void Compiler::parse_unary ()
 {
-        enum token_t op = this->peek ();
-
         if (this->match (MINUS)) {
                 this->parse_precedence (this->get_unary_precedence (MINUS));
                 this->bytecode->emit_op (OPNEG);
@@ -315,6 +323,8 @@ void Compiler::parse_terms ()
                 this->parse_error ("expected + or - operator");
                 return;
         }
+
+        this->parse_precedence (PRECEDENCE_GREATER_THAN (op));
 
         switch (op) {
         case PLUS: this->bytecode->emit_op (OPADD); break;
@@ -390,10 +400,14 @@ void Compiler::parse_while ()
         this->bytecode->patch_jump (offset_false);
 }
 
-bool Compiler::compile ()
+Bytecode *Compiler::compile ()
 {
         while (!this->match (END)) {
                 this->parse_statement ();
         }
-        return this->has_error;
+
+        if (this->has_error)
+                return NULL;
+
+        return this->bytecode;
 }
