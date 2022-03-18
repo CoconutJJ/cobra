@@ -21,13 +21,13 @@ Compiler::Compiler (FILE *source_fp)
         char *curr = source_buf;
 
         while (fread (curr, 1, read_size, source_fp) == read_size) {
-                curr = source_buf + capacity;
-
                 read_size = capacity;
 
                 capacity *= 2;
 
                 source_buf = (char *)realloc (source_buf, capacity * sizeof (char));
+
+                curr = source_buf + capacity / 2;
 
                 if (!source_buf)
                         throw -1;
@@ -45,9 +45,12 @@ void Compiler::setup (char *src_code)
                 .binary_prec = (bprec),                                                                                \
                 .unary_prec = (uprec)                                                                                  \
         }
+#define NONE_RULE(token) RULE (token, NULL, PREC_NONE, NULL, PREC_NONE)
+
         this->has_error = false;
         this->scanner = new Scanner (src_code);
         this->bytecode = new Bytecode ();
+        this->symbols = new Symbols (NULL, 0, 1);
         this->advance ();
 
         RULE (PLUS, &Compiler::parse_terms, PREC_TERM, NULL, PREC_NONE);
@@ -57,7 +60,8 @@ void Compiler::setup (char *src_code)
         RULE (LPAREN, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (INT, NULL, PREC_PRIMARY, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (FLOAT, NULL, PREC_NONE, &Compiler::parse_unary, PREC_PRIMARY);
-        RULE (END, NULL, PREC_NONE, NULL, PREC_NONE);
+        RULE (IDENTIFIER, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
+        NONE_RULE (END);
 }
 
 Parser Compiler::get_binary_parser (enum token_t t)
@@ -91,8 +95,16 @@ bool Compiler::match (enum token_t t)
 
 void Compiler::advance ()
 {
+        if (this->at_end ())
+                return;
+
         this->prev_token = this->curr_token;
         this->curr_token = this->scanner->scan_token ();
+}
+
+bool Compiler::at_end ()
+{
+        return this->curr_token.type == END;
 }
 
 enum token_t Compiler::peek ()
@@ -117,7 +129,7 @@ void Compiler::parse_statement ()
         case IF: this->parse_condition (); break;
         case WHILE: this->parse_while (); break;
         case FOR: this->parse_for (); break;
-        default: this->parse_expression (); break;
+        default: this->parse_expression_statement (); break;
         }
 }
 
@@ -143,7 +155,7 @@ void Compiler::parse_primary ()
                 strncpy (variable_name, token.name, token.len);
 
                 if (offset == -1) {
-                        this->parse_error ("undeclared variable %s", variable_name);
+                        this->parse_error ("undeclared variable %s\n", variable_name);
                         return;
                 }
 
@@ -189,14 +201,26 @@ void Compiler::parse_primary ()
 void Compiler::parse_precedence (enum Precedence prec)
 {
         enum token_t prefix = this->peek ();
-        this->advance ();
+        struct token prefixToken = this->peek_token ();
         Parser prefix_parser = this->get_unary_parser (prefix);
+
+        if (!prefix_parser) {
+                this->parse_error ("cannot use %s in expression", prefixToken.name);
+        }
 
         PARSER_FN (prefix_parser) ();
 
         while (prec <= this->get_binary_precedence (this->peek ())) {
                 enum token_t binary = this->peek ();
                 Parser binary_parser = this->get_binary_parser (binary);
+
+                if (!binary_parser) {
+                        char binary_op[prefixToken.len + 1] = { '\0' };
+                        strncpy (binary_op, prefixToken.name, prefixToken.len);
+                        this->parse_error ("unknown binary operation '%s'", binary_op);
+                        exit (EXIT_FAILURE);
+                }
+
                 PARSER_FN (binary_parser) ();
         }
 }
@@ -224,13 +248,14 @@ void Compiler::parse_logical ()
 
 void Compiler::consume (enum token_t t, const char *error_message, ...)
 {
-        if (!this->match (t)) {
-                va_list args;
-                va_start (args, error_message);
-                fprintf (stderr, "[error on line %d:%d] ", this->curr_token.line, this->curr_token.col);
-                vfprintf (stderr, error_message, args);
-                va_end (args);
-        }
+        if (this->match (t))
+                return;
+
+        va_list args;
+        va_start (args, error_message);
+        fprintf (stderr, "[error on line %d:%d] ", this->curr_token.line, this->curr_token.col);
+        vfprintf (stderr, error_message, args);
+        va_end (args);
 }
 
 void Compiler::parse_error (const char *error, ...)
@@ -335,10 +360,7 @@ void Compiler::pop_block_scope ()
 
 void Compiler::parse_condition ()
 {
-        if (!this->match (IF)) {
-                this->parse_error ("expected if statement");
-                return;
-        }
+        this->consume (IF, "expected 'if' keyword");
 
         this->consume (LPAREN, "expected '(' after if keyword");
 
@@ -363,10 +385,7 @@ void Compiler::parse_condition ()
 
 void Compiler::parse_while ()
 {
-        if (!this->match (WHILE)) {
-                this->parse_error ("expected while statement");
-                return;
-        }
+        this->consume (WHILE, "expected while keyword");
         this->consume (LPAREN, "expected '(' after while keyword");
 
         size_t start_offset = this->bytecode->address ();
@@ -418,6 +437,9 @@ Bytecode *Compiler::compile ()
         while (!this->match (END)) {
                 this->parse_statement ();
         }
+
+        if (this->scanner->has_errors)
+                return NULL;
 
         if (this->has_error)
                 return NULL;

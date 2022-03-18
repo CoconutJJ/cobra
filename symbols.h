@@ -10,8 +10,8 @@ class Symbols {
         long param_offset;
         Symbols *next_scope;
         Symbols *prev_scope;
-        std::unordered_map<std::string, long> offsets;
-        std::unordered_map<std::string, size_t> sizes;
+        std::unordered_map<std::string, long> offsets{};
+        std::unordered_map<std::string, size_t> sizes{};
         Symbols (Symbols *prev_scope, size_t local_offset, long scope_level);
         int get_stack_offset (char *variable_name, size_t len);
         size_t get_local_size (char *variable_name, size_t len);

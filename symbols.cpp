@@ -9,6 +9,7 @@ Symbols::Symbols (Symbols *prev_scope, size_t local_offset, long scope_level)
         this->scope_level = scope_level;
         this->next_scope = NULL;
         this->prev_scope = prev_scope;
+        this->offsets = std::unordered_map<std::string, long>{};
 }
 
 int Symbols::get_stack_offset (char *variable_name, size_t len)
@@ -51,9 +52,15 @@ bool Symbols::declare_function_parameter (char *variable_name, size_t len, size_
 
 std::string Symbols::convert_to_string (char *str, size_t len)
 {
-        char buf[len + 1] = { '\0' };
-        strncpy (buf, str, len);
+        char *buf = (char *)malloc ((len + 1) * sizeof (char));
 
+        if (!buf) {
+                perror ("malloc");
+                exit (EXIT_FAILURE);
+        }
+
+        strncpy (buf, str, len);
+        buf[len] = '\0';
         std::string s (buf);
 
         return s;
@@ -68,12 +75,11 @@ bool Symbols::has_symbol (char *symbol, size_t len)
 
 size_t Symbols::get_local_size (char *variable_name, size_t len)
 {
-        
-        if (!this->has_symbol(variable_name, len))
+        if (!this->has_symbol (variable_name, len))
                 return 0;
-        
-        std::string s = this->convert_to_string(variable_name, len);
-        
+
+        std::string s = this->convert_to_string (variable_name, len);
+
         return this->sizes[s];
 }
 

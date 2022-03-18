@@ -8,6 +8,7 @@ Scanner::Scanner (char *src_code)
         this->curr = this->source;
         this->line_no = 1;
         this->col_no = 0;
+        this->curr_line = this->curr;
 }
 
 void Scanner::advance ()
@@ -37,9 +38,10 @@ char Scanner::peek ()
 
 void Scanner::scan_error (const char *message, ...)
 {
+        this->has_errors = true;
         va_list args;
         va_start (args, message);
-        fprintf (stderr, "[syntax error %d:%d] ", this->line_no, this->col_no);
+        fprintf (stderr, "[syntax error on line %d:%d] ", this->line_no, this->col_no);
         vfprintf (stderr, message, args);
         va_end (args);
 }
@@ -124,6 +126,37 @@ struct token Scanner::match_number ()
         return t;
 }
 
+void Scanner::highlight_line (int start_col, int end_col)
+{
+        char *start = this->curr_line;
+        size_t line_len = 0;
+
+        fputs ("\t|\n", stderr);
+        fprintf (stderr, "%d\t| ", this->line_no);
+
+        while (*start && *start != '\n') {
+                fputc (*start, stderr);
+                start++;
+                line_len++;
+        }
+
+        fputc ('\n', stderr);
+        fputs ("\t| ", stderr);
+
+        for (int i = 0; i < start_col; i++) {
+                fputc (' ', stderr);
+        }
+
+        for (int i = start_col; i < line_len; i++) {
+                if (i < end_col)
+                        fputc ('^', stderr);
+                else
+                        fputc ('~', stderr);
+        }
+
+        fputc ('\n', stderr);
+}
+
 struct token Scanner::scan_token ()
 {
         struct token t;
@@ -133,9 +166,12 @@ struct token Scanner::scan_token ()
                         return (struct token){ .type = END };
 
                 char c = this->peek ();
+                t.name = this->curr;
+
                 this->advance ();
                 t.line = this->line_no;
                 t.col = this->col_no;
+
                 switch (c) {
                 case '+': t.type = PLUS; break;
                 case '-': t.type = MINUS; break;
@@ -146,26 +182,70 @@ struct token Scanner::scan_token ()
                                 continue;
                         }
                         t.type = DIV;
+                        t.len = 1;
                         break;
                 }
-                case '%': t.type = MOD_EQUAL; break;
-                case '(': t.type = LPAREN; break;
-                case ')': t.type = RPAREN; break;
-                case '[': t.type = LBRACKET; break;
-                case ']': t.type = RBRACKET; break;
-                case '{': t.type = LBRACE; break;
-                case '}': t.type = RBRACE; break;
-                case '|': t.type = this->match ('|') ? OR : BIT_OR; break;
-                case '>': t.type = this->match ('=') ? GTEQUAL : GT; break;
-                case '<': t.type = this->match ('=') ? LTEQUAL : LT; break;
-                case '=': t.type = this->match ('=') ? EQUAL_EQUAL : EQUAL; break;
-                case '!': t.type = this->match ('=') ? BANG_EQUAL : BANG; break;
-                case '~': t.type = BIT_NOT; break;
-                case '&': t.type = this->match ('&') ? AND : BIT_AND; break;
+                case '%':
+                        t.type = MOD_EQUAL;
+                        t.len = 1;
+                        break;
+                case '(':
+                        t.type = LPAREN;
+                        t.len = 1;
+                        break;
+                case ')':
+                        t.type = RPAREN;
+                        t.len = 1;
+                        break;
+                case '[':
+                        t.type = LBRACKET;
+                        t.len = 1;
+                        break;
+                case ']':
+                        t.type = RBRACKET;
+                        t.len = 1;
+                        break;
+                case '{':
+                        t.type = LBRACE;
+                        t.len = 1;
+                        break;
+                case '}':
+                        t.type = RBRACE;
+                        t.len = 1;
+                        break;
+                case '|':
+                        t.type = this->match ('|') ? OR : BIT_OR;
+                        t.len = 2;
+                        break;
+                case '>':
+                        t.type = this->match ('=') ? GTEQUAL : GT;
+                        t.len = 2;
+                        break;
+                case '<':
+                        t.type = this->match ('=') ? LTEQUAL : LT;
+                        t.len = 2;
+                        break;
+                case '=':
+                        t.type = this->match ('=') ? EQUAL_EQUAL : EQUAL;
+                        t.len = 2;
+                        break;
+                case '!':
+                        t.type = this->match ('=') ? BANG_EQUAL : BANG;
+                        t.len = 2;
+                        break;
+                case '~':
+                        t.type = BIT_NOT;
+                        t.len = 1;
+                        break;
+                case '&':
+                        t.type = this->match ('&') ? AND : BIT_AND;
+                        t.len = 2;
+                        break;
                 case ' ': continue;
                 case '\n': {
                         this->line_no++;
                         this->col_no = 0;
+                        this->curr_line = this->curr;
                         continue;
                 }
                 default: {
@@ -174,8 +254,9 @@ struct token Scanner::scan_token ()
                         } else if (this->is_numeric (c)) {
                                 return this->match_number ();
                         } else {
-                                this->scan_error ("unknown symbol %c", c);
-                                exit (EXIT_FAILURE);
+                                this->scan_error ("unexpected symbol '%c'\n", c);
+                                this->highlight_line (this->col_no - 1, this->col_no);
+                                continue;
                         }
 
                         break;

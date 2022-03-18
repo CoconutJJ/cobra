@@ -53,7 +53,7 @@ class Compiler {
         void setup (char * src_code);
 
         bool match (enum token_t t);
-
+        bool at_end();
         struct token peek_token ();
 
         enum token_t peek ();
