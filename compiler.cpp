@@ -36,7 +36,7 @@ Compiler::Compiler (FILE *source_fp)
         this->setup (source_buf);
 }
 
-void Compiler::setup (char * src_code)
+void Compiler::setup (char *src_code)
 {
 #define RULE(token, binary, bprec, unary, uprec)                                                                       \
         this->rules[token] = {                                                                                         \
@@ -116,8 +116,15 @@ void Compiler::parse_statement ()
         case LBRACE: this->parse_block (); break;
         case IF: this->parse_condition (); break;
         case WHILE: this->parse_while (); break;
+        case FOR: this->parse_for (); break;
         default: this->parse_expression (); break;
         }
+}
+
+void Compiler::parse_expression_statement ()
+{
+        this->parse_expression ();
+        this->bytecode->emit_op (OPPOP);
 }
 
 void Compiler::parse_expression ()
@@ -130,7 +137,6 @@ void Compiler::parse_primary ()
         struct token token = this->peek_token ();
 
         if (this->match (IDENTIFIER)) {
-                size_t local_size = this->symbols->get_local_size (token.name, token.len);
                 int offset = this->symbols->get_stack_offset (token.name, token.len);
 
                 char variable_name[token.len + 1] = { '\0' };
@@ -143,59 +149,37 @@ void Compiler::parse_primary ()
 
                 if (this->match (EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (EQUAL));
-
                         this->bytecode->emit_op (OPSTORE);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
-
                 } else if (this->match (PLUS_EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (PLUS_EQUAL));
-
                         this->bytecode->emit_op (OPLOAD);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
-
                         this->bytecode->emit_op (OPADD);
-                        this->bytecode->write_uint32 (local_size);
-
                         this->bytecode->emit_op (OPSTORE);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
                 } else if (this->match (MINUS_EQUAL)) {
-                        this->parse_precedence (PRECEDENCE_GREATER_THAN (PLUS_EQUAL));
+                        this->parse_precedence (PRECEDENCE_GREATER_THAN (MINUS_EQUAL));
                         this->bytecode->emit_op (OPNEG);
-                        this->bytecode->write_uint32 (local_size);
-
                         this->bytecode->emit_op (OPLOAD);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
-
                         this->bytecode->emit_op (OPADD);
-                        this->bytecode->write_uint32 (local_size);
-
                         this->bytecode->emit_op (OPSTORE);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
                 } else if (this->match (MULT_EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (MULT_EQUAL));
-
                         this->bytecode->emit_op (OPLOAD);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
-
                         this->bytecode->emit_op (OPMULT);
-                        this->bytecode->write_uint32 (local_size);
-
                         this->bytecode->emit_op (OPSTORE);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
                 } else {
                         this->bytecode->emit_op (OPLOAD);
-                        this->bytecode->write_uint32 (local_size);
                         this->bytecode->write_uint32 (offset);
                 }
-
-        } else if (this->match (INT) || this->match (FLOAT) || this->match (DOUBLE)) {
+        } else if (this->match (INT)) {
+                this->bytecode->emit_op (OPPUSH);
+                this->bytecode->write_uint32 (token.i);
         } else if (this->match (LPAREN)) {
                 this->parse_precedence (PREC_ASSIGNMENT);
                 this->match (RPAREN);
@@ -398,6 +382,35 @@ void Compiler::parse_while ()
         this->bytecode->emit_jump (start_offset);
 
         this->bytecode->patch_jump (offset_false);
+}
+
+void Compiler::parse_for ()
+{
+        this->consume (FOR, "expected for statement");
+
+        this->consume (LPAREN, "expected '(' after for keyword");
+
+        this->parse_expression ();
+        this->consume (SEMICOLON, "expected ';' after for initializer");
+
+        size_t start_offset = this->bytecode->address ();
+
+        this->parse_expression ();
+        this->consume (SEMICOLON, "expected ';' after for condition");
+        size_t condition_false_offset = this->bytecode->emit_jump_false ();
+        size_t condition_true_offset = this->bytecode->emit_jump ();
+
+        size_t update_offset = this->bytecode->address ();
+        this->parse_expression ();
+        this->consume (SEMICOLON, "expected ';' after for update");
+        this->bytecode->emit_jump (start_offset);
+
+        this->consume (RPAREN, "expected ')' after for statement");
+
+        this->bytecode->patch_jump (condition_true_offset);
+        this->parse_statement ();
+        this->bytecode->emit_jump (update_offset);
+        this->bytecode->patch_jump (condition_false_offset);
 }
 
 Bytecode *Compiler::compile ()

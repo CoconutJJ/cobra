@@ -69,7 +69,7 @@ class Compiler {
         void parse_for ();
         void parse_block ();
         void parse_expression ();
-
+        void parse_expression_statement ();
         void push_block_scope ();
         void pop_block_scope ();
 

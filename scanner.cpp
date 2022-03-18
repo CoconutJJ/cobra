@@ -38,10 +38,10 @@ char Scanner::peek ()
 void Scanner::scan_error (const char *message, ...)
 {
         va_list args;
-        va_start(args, message);
-        fprintf(stderr, "[syntax error %d:%d] ", this->line_no, this->col_no);
-        vfprintf(stderr, message, args);
-        va_end(args);
+        va_start (args, message);
+        fprintf (stderr, "[syntax error %d:%d] ", this->line_no, this->col_no);
+        vfprintf (stderr, message, args);
+        va_end (args);
 }
 
 void Scanner::skip_comment ()
@@ -174,8 +174,8 @@ struct token Scanner::scan_token ()
                         } else if (this->is_numeric (c)) {
                                 return this->match_number ();
                         } else {
-                                this->scan_error("unknown symbol %c", c);
-                                exit(EXIT_FAILURE);
+                                this->scan_error ("unknown symbol %c", c);
+                                exit (EXIT_FAILURE);
                         }
 
                         break;

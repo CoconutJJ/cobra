@@ -24,7 +24,8 @@ enum OpCode {
     OPPUSH,
     OPPOP,
     OPCALL,
-    OPHALT
+    OPHALT,
+    OPBP
 };
 
 class Bytecode {
@@ -41,6 +42,7 @@ class Bytecode {
         size_t write_uint8(uint8_t sh);
         size_t write_uint16(uint16_t sh);
         size_t write_uint32(uint32_t sh);
+        size_t write_uint64(uint64_t sh);
         
     private:
         void resize_chunk(size_t min_size);

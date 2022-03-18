@@ -1,6 +1,6 @@
 CC=g++
 OBJ=bytecode.o compiler.o scanner.o symbols.o cobra.o
-FLAGS=-Og -g -Wall
+FLAGS=-Ofast -s -Wall
 
 all: cobra clean
 
