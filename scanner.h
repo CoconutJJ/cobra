@@ -52,6 +52,7 @@ enum token_t {
 };
 struct token {
         char *name;
+        char *code_line;
         size_t len;
         union {
                 int i;
@@ -71,11 +72,12 @@ class Scanner {
         int col_no;
         char *curr_line;
         bool has_errors;
+
     private:
         char *source;
         char *curr;
-        void scan_error(const char *message, ...);
-        void highlight_line(int start_col, int end_col);
+        void scan_error (const char *message, ...);
+        void highlight_line (int start_col, int end_col);
         bool match (char c);
         bool at_end ();
         char peek ();

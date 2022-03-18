@@ -1,9 +1,10 @@
 CC=g++
 OBJ=bytecode.o compiler.o scanner.o symbols.o cobra.o
-FLAGS=-Og -g -Wall
+FLAGS=-Ofast -s -Wall
 
 all: cobra clean
-
+debug: FLAGS=-Og -g -Wall
+debug: cobra clean
 cobra: $(OBJ)
 	$(CC) $(FLAGS) $(OBJ) -o cobra
 

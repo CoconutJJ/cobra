@@ -37,7 +37,7 @@ class Compiler {
     public:
         Compiler (char *src_code);
         Compiler (FILE *source_fp);
-        Bytecode* compile ();
+        Bytecode *compile ();
 
     private:
         struct ParseRule rules[100];
@@ -50,10 +50,10 @@ class Compiler {
 
         bool has_error;
 
-        void setup (char * src_code);
+        void setup (char *src_code);
 
         bool match (enum token_t t);
-        bool at_end();
+        bool at_end ();
         struct token peek_token ();
 
         enum token_t peek ();
@@ -79,7 +79,8 @@ class Compiler {
         enum Precedence get_binary_precedence (enum token_t t);
         enum Precedence get_unary_precedence (enum token_t t);
 
-        void parse_error (const char *error, ...);
+        void parse_error (const char *error, struct token t, ...);
+        void highlight_line (struct token t);
         void parse_precedence (enum Precedence prec);
         void parse_primary ();
         void parse_unary ();

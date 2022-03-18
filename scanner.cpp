@@ -85,19 +85,20 @@ enum token_t Scanner::match_keyword (char *keyword, int length)
 
 struct token Scanner::match_identifier ()
 {
+        struct token t;
+
+        t.col = this->col_no;
+
         char *start = this->curr - 1;
 
         while (this->is_valid_identifier_char (this->peek ()) && !this->at_end ())
                 this->advance ();
 
-        struct token t;
-
         t.name = start;
         t.len = this->curr - start;
         t.line = this->line_no;
-        t.col = this->col_no;
         t.type = this->match_keyword (start, t.len);
-
+        t.code_line = this->curr_line;
         return t;
 }
 
@@ -106,7 +107,7 @@ struct token Scanner::match_number ()
         char *start = this->curr - 1;
 
         struct token t;
-
+        t.code_line = this->curr_line;
         while (this->is_numeric (this->peek ()) && !this->at_end ()) {
                 this->advance ();
         }
@@ -132,7 +133,7 @@ void Scanner::highlight_line (int start_col, int end_col)
         size_t line_len = 0;
 
         fputs ("\t|\n", stderr);
-        fprintf (stderr, "%d\t| ", this->line_no);
+        fprintf (stderr, " %d\t| ", this->line_no);
 
         while (*start && *start != '\n') {
                 fputc (*start, stderr);
@@ -147,12 +148,8 @@ void Scanner::highlight_line (int start_col, int end_col)
                 fputc (' ', stderr);
         }
 
-        for (int i = start_col; i < line_len; i++) {
-                if (i < end_col)
-                        fputc ('^', stderr);
-                else
-                        fputc ('~', stderr);
-        }
+        for (int i = start_col; i < line_len; i++)
+                fputc (i < end_col ? '^' : '~', stderr);
 
         fputc ('\n', stderr);
 }
@@ -171,7 +168,7 @@ struct token Scanner::scan_token ()
                 this->advance ();
                 t.line = this->line_no;
                 t.col = this->col_no;
-
+                t.code_line = this->curr_line;
                 switch (c) {
                 case '+': t.type = PLUS; break;
                 case '-': t.type = MINUS; break;

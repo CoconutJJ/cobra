@@ -64,6 +64,30 @@ void Compiler::setup (char *src_code)
         NONE_RULE (END);
 }
 
+void Compiler::highlight_line (struct token t)
+{
+        fprintf (stderr, "\t|\n");
+        fprintf (stderr, " %d\t| ", t.line);
+
+        char *curr = t.code_line;
+
+        for (int i = 0; *curr != '\n' && *curr != '\0'; i++, curr++) {
+                fputc (*curr, stderr);
+        }
+
+        fprintf (stderr, "\n\t|");
+        curr = t.code_line;
+        for (int i = 0; *curr != '\n' && *curr != '\0'; i++, curr++) {
+                if (i < t.col)
+                        fputc (' ', stderr);
+                else if (t.col <= i && i < t.col + t.len)
+                        fputc ('^', stderr);
+                else
+                        fputc ('~', stderr);
+        }
+        fputc ('\n', stderr);
+}
+
 Parser Compiler::get_binary_parser (enum token_t t)
 {
         return this->rules[t].binary_parser;
@@ -155,7 +179,7 @@ void Compiler::parse_primary ()
                 strncpy (variable_name, token.name, token.len);
 
                 if (offset == -1) {
-                        this->parse_error ("undeclared variable %s\n", variable_name);
+                        this->parse_error ("undeclared variable %s\n", token, variable_name);
                         return;
                 }
 
@@ -201,23 +225,24 @@ void Compiler::parse_primary ()
 void Compiler::parse_precedence (enum Precedence prec)
 {
         enum token_t prefix = this->peek ();
-        struct token prefixToken = this->peek_token ();
+        struct token prefix_token = this->peek_token ();
         Parser prefix_parser = this->get_unary_parser (prefix);
 
         if (!prefix_parser) {
-                this->parse_error ("cannot use %s in expression", prefixToken.name);
+                this->parse_error ("cannot use %s in expression", prefix_token, prefix_token.name);
         }
 
         PARSER_FN (prefix_parser) ();
 
         while (prec <= this->get_binary_precedence (this->peek ())) {
                 enum token_t binary = this->peek ();
+
                 Parser binary_parser = this->get_binary_parser (binary);
 
                 if (!binary_parser) {
-                        char binary_op[prefixToken.len + 1] = { '\0' };
-                        strncpy (binary_op, prefixToken.name, prefixToken.len);
-                        this->parse_error ("unknown binary operation '%s'", binary_op);
+                        char binary_op[prefix_token.len + 1] = { '\0' };
+                        strncpy (binary_op, prefix_token.name, prefix_token.len);
+                        this->parse_error ("unknown binary operation '%s'", this->peek_token (), binary_op);
                         exit (EXIT_FAILURE);
                 }
 
@@ -228,9 +253,9 @@ void Compiler::parse_precedence (enum Precedence prec)
 void Compiler::parse_logical ()
 {
         enum token_t op = this->peek ();
-
+        struct token op_token = this->peek_token ();
         if (!this->match (AND) && !this->match (OR)) {
-                this->parse_error ("expected '&&' or '||' operation");
+                this->parse_error ("expected '&&' or '||' operation", op_token);
                 return;
         }
         if (this->previous () == AND) {
@@ -256,16 +281,20 @@ void Compiler::consume (enum token_t t, const char *error_message, ...)
         fprintf (stderr, "[error on line %d:%d] ", this->curr_token.line, this->curr_token.col);
         vfprintf (stderr, error_message, args);
         va_end (args);
+        this->highlight_line (this->peek_token ());
+        exit (EXIT_FAILURE);
 }
 
-void Compiler::parse_error (const char *error, ...)
+void Compiler::parse_error (const char *error, struct token t, ...)
 {
         this->has_error = true;
         va_list args;
-        va_start (args, error);
-        fprintf (stderr, "[error on line %d:%d] ", this->curr_token.line, this->curr_token.col);
+        va_start (args, t);
+        fprintf (stderr, "[error on line %d:%d] ", t.line, t.col);
         vfprintf (stderr, error, args);
         va_end (args);
+        this->highlight_line (t);
+        exit (EXIT_FAILURE);
 }
 
 void Compiler::parse_block ()
@@ -289,9 +318,9 @@ void Compiler::parse_unary ()
 void Compiler::parse_comparison ()
 {
         enum token_t op = this->peek ();
-
+        struct token op_token = this->peek_token ();
         if (!this->match (GT) && !this->match (GTEQUAL) && !this->match (LT) && !this->match (LTEQUAL)) {
-                this->parse_error ("expected >, >=, <=, < after lvalue");
+                this->parse_error ("expected >, >=, <=, < after lvalue", op_token);
                 return;
         }
 
@@ -309,9 +338,9 @@ void Compiler::parse_comparison ()
 void Compiler::parse_products ()
 {
         enum token_t op = this->peek ();
-
+        struct token op_token = this->peek_token ();
         if (!this->match (MULT) && !this->match (DIV)) {
-                this->parse_error ("expected * or /");
+                this->parse_error ("expected * or /", op_token);
                 return;
         }
 
@@ -327,9 +356,9 @@ void Compiler::parse_products ()
 void Compiler::parse_terms ()
 {
         enum token_t op = this->peek ();
-
+        struct token op_token = this->peek_token ();
         if (!this->match (PLUS) && !this->match (MINUS)) {
-                this->parse_error ("expected + or - operator");
+                this->parse_error ("expected + or - operator", op_token);
                 return;
         }
 
