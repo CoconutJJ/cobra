@@ -23,11 +23,13 @@ int main (int argc, char **argv)
 
         if (!bytes)
                 exit (EXIT_FAILURE);
-        
-        FILE *outfp = fopen("a.bin", "w");
-        
-        if (fwrite(bytes->chunk, bytes->count, 1, outfp) != 1) {
-                fprintf(stderr, "fatal error: failed to write to out file");
-                exit(EXIT_FAILURE);
+
+        FILE *outfp = fopen ("a.bin", "w");
+
+        if (fwrite (bytes->chunk, bytes->count, 1, outfp) != 1) {
+                fprintf (stderr, "fatal error: failed to write to out file");
+                exit (EXIT_FAILURE);
         }
+
+        bytes->dump_bytecode ();
 }

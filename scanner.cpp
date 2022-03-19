@@ -9,18 +9,25 @@ Scanner::Scanner (char *src_code)
         this->line_no = 1;
         this->col_no = 0;
         this->curr_line = this->curr;
+        this->has_errors = false;
 }
 
 void Scanner::advance ()
 {
+        if (this->at_end ())
+                return;
+
         this->curr++;
         this->col_no++;
 }
 
 bool Scanner::match (char c)
 {
-        if (*this->curr == c) {
-                advance ();
+        if (this->at_end ())
+                return false;
+
+        if (*(this->curr) == c) {
+                this->advance ();
                 return true;
         }
         return false;
@@ -33,7 +40,10 @@ bool Scanner::at_end ()
 
 char Scanner::peek ()
 {
-        return *this->curr;
+        if (this->at_end())
+                return '\0';
+
+        return *(this->curr);
 }
 
 void Scanner::scan_error (const char *message, ...)

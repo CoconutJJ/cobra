@@ -43,9 +43,11 @@ class Bytecode {
         size_t write_uint16(uint16_t sh);
         size_t write_uint32(uint32_t sh);
         size_t write_uint64(uint64_t sh);
-        
+        void dump_bytecode();
+
     private:
         void resize_chunk(size_t min_size);
-
+        const char *get_op_name(enum OpCode op);
+        
 };
 #endif

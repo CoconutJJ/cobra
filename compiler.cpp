@@ -11,27 +11,15 @@ Compiler::Compiler (char *src_code)
 
 Compiler::Compiler (FILE *source_fp)
 {
-        size_t capacity = 8;
-        size_t read_size = 8;
+        fseek (source_fp, 0, SEEK_END);
 
-        char *source_buf = (char *)malloc (capacity * sizeof (char));
-        if (!source_buf)
-                throw -1;
+        size_t file_size = ftell (source_fp);
 
-        char *curr = source_buf;
+        fseek (source_fp, 0, SEEK_SET);
 
-        while (fread (curr, 1, read_size, source_fp) == read_size) {
-                read_size = capacity;
+        char *source_buf = (char *)calloc ((file_size + 1), sizeof (char));
 
-                capacity *= 2;
-
-                source_buf = (char *)realloc (source_buf, capacity * sizeof (char));
-
-                curr = source_buf + capacity / 2;
-
-                if (!source_buf)
-                        throw -1;
-        }
+        fread (source_buf, file_size, 1, source_fp);
 
         this->setup (source_buf);
 }
@@ -51,7 +39,8 @@ void Compiler::setup (char *src_code)
         this->scanner = new Scanner (src_code);
         this->bytecode = new Bytecode ();
         this->symbols = new Symbols (NULL, 0, 1);
-        this->advance ();
+        this->prev_token = (struct token){ 0 };
+        this->curr_token = this->scanner->scan_token ();
 
         RULE (PLUS, &Compiler::parse_terms, PREC_TERM, NULL, PREC_NONE);
         RULE (MINUS, &Compiler::parse_terms, PREC_TERM, &Compiler::parse_unary, PREC_UNARY);
@@ -61,6 +50,7 @@ void Compiler::setup (char *src_code)
         RULE (INT, NULL, PREC_PRIMARY, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (FLOAT, NULL, PREC_NONE, &Compiler::parse_unary, PREC_PRIMARY);
         RULE (IDENTIFIER, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
+        NONE_RULE (RPAREN);
         NONE_RULE (END);
 }
 
@@ -382,8 +372,7 @@ void Compiler::push_block_scope ()
 void Compiler::pop_block_scope ()
 {
         long offset = this->symbols->local_offset;
-        this->bytecode->emit_op (OPPOP);
-        this->bytecode->write_uint32 (offset);
+        
         this->symbols = this->symbols->pop_scope ();
 }
 

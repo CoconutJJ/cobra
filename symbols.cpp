@@ -22,7 +22,7 @@ int Symbols::get_stack_offset (char *variable_name, size_t len)
         return this->offsets[s];
 }
 
-bool Symbols::declare_local_variable (char *variable_name, size_t len, size_t variable_size)
+bool Symbols::declare_local_variable (char *variable_name, size_t len)
 {
         if (!this->has_symbol (variable_name, len))
                 return false;
@@ -30,21 +30,20 @@ bool Symbols::declare_local_variable (char *variable_name, size_t len, size_t va
         std::string s = this->convert_to_string (variable_name, len);
 
         this->offsets[s] = this->local_offset;
-        this->sizes[s] = variable_size;
-        this->local_offset += variable_size;
-
+        this->local_offset += 1;
+        this->symbols_count++;
         return true;
 }
 
-bool Symbols::declare_function_parameter (char *variable_name, size_t len, size_t parameter_size)
+bool Symbols::declare_function_parameter (char *variable_name, size_t len)
 {
         if (!this->has_symbol (variable_name, len))
                 return false;
 
         std::string s = this->convert_to_string (variable_name, len);
 
-        this->param_offset += parameter_size;
-
+        this->param_offset += 1;
+        this->symbols_count++;
         this->offsets[s] = -this->param_offset;
 
         return true;
@@ -73,14 +72,9 @@ bool Symbols::has_symbol (char *symbol, size_t len)
         return this->offsets.find (s) != this->offsets.end ();
 }
 
-size_t Symbols::get_local_size (char *variable_name, size_t len)
+int Symbols::get_symbols_count ()
 {
-        if (!this->has_symbol (variable_name, len))
-                return 0;
-
-        std::string s = this->convert_to_string (variable_name, len);
-
-        return this->sizes[s];
+        return this->symbols_count;
 }
 
 Symbols *Symbols::new_scope ()
