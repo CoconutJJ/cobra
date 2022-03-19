@@ -136,7 +136,7 @@ void Bytecode::dump_bytecode ()
                 uint8_t op_byte = this->chunk[c++];
                 enum OpCode op = (enum OpCode)op_byte;
 
-                printf ("%s ", this->get_op_name (op));
+                printf ("%" PRIu64 ": %s ", c - 1, this->get_op_name (op));
 
                 switch (op) {
                 case OPJMP:

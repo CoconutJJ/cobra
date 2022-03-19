@@ -40,7 +40,7 @@ bool Scanner::at_end ()
 
 char Scanner::peek ()
 {
-        if (this->at_end())
+        if (this->at_end ())
                 return '\0';
 
         return *(this->curr);
@@ -81,6 +81,8 @@ enum token_t Scanner::match_keyword (char *keyword, int length)
 {
         if (strncmp (keyword, "if", length) == 0)
                 return IF;
+        if (strncmp (keyword, "else", length) == 0)
+                return ELSE;
         if (strncmp (keyword, "while", length) == 0)
                 return WHILE;
         if (strncmp (keyword, "for", length) == 0)
@@ -247,6 +249,10 @@ struct token Scanner::scan_token ()
                 case '&':
                         t.type = this->match ('&') ? AND : BIT_AND;
                         t.len = 2;
+                        break;
+                case ';':
+                        t.type = SEMICOLON;
+                        t.len = 1;
                         break;
                 case ' ': continue;
                 case '\n': {

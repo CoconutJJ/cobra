@@ -17,11 +17,21 @@ Compiler::Compiler (FILE *source_fp)
 
         fseek (source_fp, 0, SEEK_SET);
 
+        if (file_size == 0) {
+                fprintf (stderr, "error: empty file\n");
+                exit (EXIT_FAILURE);
+        }
+
         char *source_buf = (char *)calloc ((file_size + 1), sizeof (char));
 
         fread (source_buf, file_size, 1, source_fp);
 
         this->setup (source_buf);
+}
+
+Compiler::~Compiler ()
+{
+        
 }
 
 void Compiler::setup (char *src_code)
@@ -46,10 +56,19 @@ void Compiler::setup (char *src_code)
         RULE (MINUS, &Compiler::parse_terms, PREC_TERM, &Compiler::parse_unary, PREC_UNARY);
         RULE (MULT, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_NONE);
         RULE (DIV, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_PRODUCT);
+        RULE (LT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (GT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (LTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (GTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (AND, &Compiler::parse_logical, PREC_LOGICAL, NULL, PREC_NONE);
+        RULE (OR, &Compiler::parse_logical, PREC_LOGICAL, NULL, PREC_NONE);
+
         RULE (LPAREN, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (INT, NULL, PREC_PRIMARY, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (FLOAT, NULL, PREC_NONE, &Compiler::parse_unary, PREC_PRIMARY);
         RULE (IDENTIFIER, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
+
+        NONE_RULE (SEMICOLON);
         NONE_RULE (RPAREN);
         NONE_RULE (END);
 }
@@ -271,6 +290,7 @@ void Compiler::consume (enum token_t t, const char *error_message, ...)
         fprintf (stderr, "[error on line %d:%d] ", this->curr_token.line, this->curr_token.col);
         vfprintf (stderr, error_message, args);
         va_end (args);
+        fputc ('\n', stderr);
         this->highlight_line (this->peek_token ());
         exit (EXIT_FAILURE);
 }
@@ -371,8 +391,12 @@ void Compiler::push_block_scope ()
 
 void Compiler::pop_block_scope ()
 {
-        long offset = this->symbols->local_offset;
-        
+        int symbol_count = this->symbols->get_symbols_count ();
+
+        for (int i = 0; i < symbol_count; i++) {
+                this->bytecode->emit_op (OPPOP);
+        }
+
         this->symbols = this->symbols->pop_scope ();
 }
 
@@ -439,7 +463,6 @@ void Compiler::parse_for ()
 
         size_t update_offset = this->bytecode->address ();
         this->parse_expression ();
-        this->consume (SEMICOLON, "expected ';' after for update");
         this->bytecode->emit_jump (start_offset);
 
         this->consume (RPAREN, "expected ')' after for statement");
@@ -455,6 +478,8 @@ Bytecode *Compiler::compile ()
         while (!this->match (END)) {
                 this->parse_statement ();
         }
+
+        this->bytecode->emit_op (OPHALT);
 
         if (this->scanner->has_errors)
                 return NULL;

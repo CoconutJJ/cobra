@@ -37,6 +37,7 @@ class Compiler {
     public:
         Compiler (char *src_code);
         Compiler (FILE *source_fp);
+        ~Compiler();
         Bytecode *compile ();
 
     private:
