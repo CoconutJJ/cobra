@@ -27,9 +27,6 @@ int Symbols::get_stack_offset (char *variable_name, size_t len)
 
 bool Symbols::declare_local_variable (char *variable_name, size_t len)
 {
-        if (!this->has_symbol (variable_name, len))
-                return false;
-
         std::string s = this->convert_to_string (variable_name, len);
 
         this->offsets[s] = this->local_offset;
@@ -40,9 +37,6 @@ bool Symbols::declare_local_variable (char *variable_name, size_t len)
 
 bool Symbols::declare_function_parameter (char *variable_name, size_t len)
 {
-        if (!this->has_symbol (variable_name, len))
-                return false;
-
         std::string s = this->convert_to_string (variable_name, len);
 
         this->param_offset += 1;
@@ -66,6 +60,16 @@ std::string Symbols::convert_to_string (char *str, size_t len)
         std::string s (buf);
 
         return s;
+}
+
+bool Symbols::is_declared (char *variable_name, size_t len) {
+
+        if (this->has_symbol(variable_name, len)) return true;
+
+        if (!this->prev_scope) return false;
+
+        return this->prev_scope->is_declared(variable_name, len);
+
 }
 
 bool Symbols::has_symbol (char *symbol, size_t len)

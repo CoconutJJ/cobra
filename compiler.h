@@ -1,9 +1,11 @@
 #ifndef compiler_h
 #define compiler_h
 #include "bytecode.h"
+#include "function.h"
 #include "scanner.h"
 #include "symbols.h"
 #include <stdarg.h>
+#include <vector>
 /**
  * Convert member function pointer to callable method
  */
@@ -37,8 +39,9 @@ class Compiler {
     public:
         Compiler (char *src_code);
         Compiler (FILE *source_fp);
-        ~Compiler();
+        ~Compiler ();
         Bytecode *compile ();
+        Bytecode *link ();
 
     private:
         struct ParseRule rules[100];
@@ -47,7 +50,8 @@ class Compiler {
 
         Scanner *scanner;
         Symbols *symbols;
-        Bytecode *bytecode;
+        Function *function;
+        std::vector<Function *> functions;
 
         bool has_error;
 
@@ -71,6 +75,7 @@ class Compiler {
         void parse_block ();
         void parse_expression ();
         void parse_expression_statement ();
+        void parse_function_statement ();
         void push_block_scope ();
         void pop_block_scope ();
 

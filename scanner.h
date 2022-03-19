@@ -43,6 +43,7 @@ enum token_t {
         RETURN,
         FUNC,
         SEMICOLON,
+        COMMA,
         INT,
         FLOAT,
         DOUBLE,

@@ -18,6 +18,7 @@ class Symbols {
         bool declare_local_variable (char *variable_name, size_t len);
         bool declare_function_parameter (char *parameter_name, size_t len);
         bool has_symbol (char *symbol, size_t len);
+        bool is_declared (char *variable_name, size_t len);
         int get_symbols_count();
         Symbols *new_scope ();
         Symbols *pop_scope ();

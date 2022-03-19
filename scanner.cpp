@@ -254,6 +254,10 @@ struct token Scanner::scan_token ()
                         t.type = SEMICOLON;
                         t.len = 1;
                         break;
+                case ',':
+                        t.type = COMMA;
+                        t.len = 1;
+                        break;
                 case ' ': continue;
                 case '\n': {
                         this->line_no++;

@@ -10,12 +10,13 @@ Bytecode::Bytecode ()
 {
         this->capacity = (1 << 8);
 
-        this->chunk = (uint8_t *)malloc (this->capacity * sizeof (uint16_t));
+        this->chunk = (int8_t *)malloc (this->capacity * sizeof (int16_t));
 
         if (!this->chunk)
                 throw -1;
 
         this->count = 0;
+        this->address_offset = 0;
 }
 
 /**
@@ -26,7 +27,7 @@ void Bytecode::resize_chunk (size_t min_size)
         while (this->capacity < min_size)
                 this->capacity *= 2;
 
-        this->chunk = (uint8_t *)realloc (this->chunk, this->capacity);
+        this->chunk = (int8_t *)realloc (this->chunk, this->capacity);
 
         if (!this->chunk)
                 throw -1;
@@ -35,54 +36,55 @@ void Bytecode::resize_chunk (size_t min_size)
 /**
  * Write a 8 bit integer
  */
-size_t Bytecode::write_uint8 (uint8_t sh)
+size_t Bytecode::write_int8 (int8_t sh)
 {
-        if (this->count + sizeof (uint8_t) >= this->capacity)
-                this->resize_chunk (this->count + sizeof (uint8_t));
+        if (this->count + sizeof (int8_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (int8_t));
 
-        WRITE_INT (uint8_t, this->count, sh);
-        this->count += sizeof (uint8_t);
+        WRITE_INT (int8_t, this->count, sh);
+        this->count += sizeof (int8_t);
 
-        return this->count - sizeof (uint8_t);
+        return this->count - sizeof (int8_t);
 }
 
 /**
  * Write a 16 bit integer
  */
-size_t Bytecode::write_uint16 (uint16_t sh)
+size_t Bytecode::write_int16 (int16_t sh)
 {
-        if (this->count + sizeof (uint16_t) >= this->capacity)
-                this->resize_chunk (this->count + sizeof (uint16_t));
+        if (this->count + sizeof (int16_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (int16_t));
 
-        WRITE_INT (uint16_t, this->count, sh);
-        this->count += sizeof (uint16_t);
+        WRITE_INT (int16_t, this->count, sh);
+        this->count += sizeof (int16_t);
 
-        return this->count - sizeof (uint16_t);
+        return this->count - sizeof (int16_t);
 }
 
 /**
  * Write a 32 bit integer
  */
-size_t Bytecode::write_uint32 (uint32_t sh)
+size_t Bytecode::write_int32 (int32_t sh)
 {
-        if (this->count + sizeof (uint32_t) >= this->capacity)
-                this->resize_chunk (this->count + sizeof (uint32_t));
+        if (this->count + sizeof (int32_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (int32_t));
 
-        WRITE_INT (uint32_t, this->count, sh);
-        this->count += sizeof (uint32_t);
+        WRITE_INT (int32_t, this->count, sh);
+        this->count += sizeof (int32_t);
 
-        return this->count - sizeof (uint32_t);
+        return this->count - sizeof (int32_t);
 }
 
-size_t Bytecode::write_uint64 (uint64_t sh)
+size_t Bytecode::write_int64 (int64_t sh)
 {
-        if (this->count + sizeof(uint64_t) >= this->capacity)
-                this->resize_chunk (this->count + sizeof(uint64_t));
+        if (this->count + sizeof (int64_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (int64_t));
 
-        WRITE_INT (uint64_t, this->count, sh);
-        this->count += sizeof (uint64_t);
+        WRITE_INT (int64_t, this->count, sh);
+        this->count += sizeof (int64_t);
 
-        return this->count - sizeof (uint64_t);;
+        return this->count - sizeof (int64_t);
+        ;
 }
 
 /**
@@ -98,16 +100,16 @@ size_t Bytecode::address ()
  */
 void Bytecode::emit_op (enum OpCode op)
 {
-        this->write_uint8 (op & 0xFF);
+        this->write_int8 (op & 0xFF);
 }
 
 /**
  * Write unconditional jump instruction
  */
-size_t Bytecode::emit_jump (uint32_t address)
+size_t Bytecode::emit_jump (int32_t address)
 {
         this->emit_op (OPJMP);
-        return this->write_uint32 (address);
+        return this->write_int32 (address);
 }
 
 /**
@@ -116,7 +118,7 @@ size_t Bytecode::emit_jump (uint32_t address)
 size_t Bytecode::emit_jump_false ()
 {
         this->emit_op (OPJMPFALSE);
-        return this->write_uint32 (0xFFFFFFFF);
+        return this->write_int32 (0xFFFFFFFF);
 }
 
 /**
@@ -124,16 +126,14 @@ size_t Bytecode::emit_jump_false ()
  */
 void Bytecode::patch_jump (size_t offset)
 {
-        *((uint32_t *)&this->chunk[offset]) = this->count;
+        *((int32_t *)&this->chunk[offset]) = this->count;
 }
 
 void Bytecode::dump_bytecode ()
 {
-#define AS_UINT32(ptr) (*((uint32_t *)ptr))
-
         size_t c = 0;
         while (c < this->count) {
-                uint8_t op_byte = this->chunk[c++];
+                int8_t op_byte = this->chunk[c++];
                 enum OpCode op = (enum OpCode)op_byte;
 
                 printf ("%" PRIu64 ": %s ", c - 1, this->get_op_name (op));
@@ -143,13 +143,45 @@ void Bytecode::dump_bytecode ()
                 case OPJMPFALSE:
                 case OPSTORE:
                 case OPLOAD:
-                case OPPUSH:
-                case OPPOP:
-                case OPCALL: printf ("%" PRIu32 "\n", AS_UINT32 (&this->chunk[c])); break;
+                case OPPUSH: printf ("%" PRIi32 "\n", AS_INT32 (&this->chunk[c])); break;
                 default: printf ("\n"); continue;
                 }
-                c += sizeof (uint32_t);
+                c += sizeof (int32_t);
         }
+}
+
+void Bytecode::set_address_offset (size_t offset)
+{
+        size_t c = 0;
+        while (c < this->count) {
+                int8_t op_byte = this->chunk[c++];
+                enum OpCode op = (enum OpCode)op_byte;
+
+                switch (op) {
+                case OPJMPFALSE:
+                case OPCALL:
+                case OPJMP: {
+                        int32_t old_offset = AS_INT32 (&this->chunk[c]);
+                        WRITE_INT (int32_t, c, old_offset - this->address_offset + offset);
+                        c += sizeof (int32_t);
+                        break;
+                }
+                default: continue; break;
+                }
+        }
+}
+
+void Bytecode::import(int8_t *bytecode, size_t size) {
+
+        this->resize_chunk(this->capacity + size);
+
+        while (size > 0) {
+                this->chunk[this->count++] = *bytecode;
+                bytecode++;
+                size--;
+        }
+
+
 }
 
 const char *Bytecode::get_op_name (enum OpCode op)
