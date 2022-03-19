@@ -139,7 +139,7 @@ struct token Scanner::match_number ()
         return t;
 }
 
-void Scanner::highlight_line (int start_col, int end_col)
+void Scanner::highlight_line (size_t start_col, size_t end_col)
 {
         char *start = this->curr_line;
         size_t line_len = 0;
@@ -156,11 +156,11 @@ void Scanner::highlight_line (int start_col, int end_col)
         fputc ('\n', stderr);
         fputs ("\t| ", stderr);
 
-        for (int i = 0; i < start_col; i++) {
+        for (size_t i = 0; i < start_col; i++) {
                 fputc (' ', stderr);
         }
 
-        for (int i = start_col; i < line_len; i++)
+        for (size_t i = start_col; i < line_len; i++)
                 fputc (i < end_col ? '^' : '~', stderr);
 
         fputc ('\n', stderr);

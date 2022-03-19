@@ -60,8 +60,8 @@ struct token {
                 double d;
         };
         enum token_t type;
-        int line;
-        int col;
+        size_t line;
+        size_t col;
 };
 
 class Scanner {
@@ -77,7 +77,7 @@ class Scanner {
         char *source;
         char *curr;
         void scan_error (const char *message, ...);
-        void highlight_line (int start_col, int end_col);
+        void highlight_line (size_t start_col, size_t end_col);
         bool match (char c);
         bool at_end ();
         char peek ();

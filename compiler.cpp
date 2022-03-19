@@ -31,7 +31,6 @@ Compiler::Compiler (FILE *source_fp)
 
 Compiler::~Compiler ()
 {
-        
 }
 
 void Compiler::setup (char *src_code)
@@ -44,14 +43,32 @@ void Compiler::setup (char *src_code)
                 .unary_prec = (uprec)                                                                                  \
         }
 #define NONE_RULE(token) RULE (token, NULL, PREC_NONE, NULL, PREC_NONE)
-
+        /*
+         * indicates whether an compilation error has occurred.
+         */
         this->has_error = false;
         this->scanner = new Scanner (src_code);
+
+        /*
+         * setup a bytecode output buffer object, this stores our emitted bytecode.
+         */
         this->bytecode = new Bytecode ();
+
+        /*
+         * initialize a symbols object to keep track of variable names/function
+         * parameters
+         */
         this->symbols = new Symbols (NULL, 0, 1);
+
+        /*
+         * scan a single token to setup the compiler for parsing
+         */
         this->prev_token = (struct token){ 0 };
         this->curr_token = this->scanner->scan_token ();
 
+        /**
+         * Binary/Unary operators
+         */
         RULE (PLUS, &Compiler::parse_terms, PREC_TERM, NULL, PREC_NONE);
         RULE (MINUS, &Compiler::parse_terms, PREC_TERM, &Compiler::parse_unary, PREC_UNARY);
         RULE (MULT, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_NONE);
@@ -63,6 +80,9 @@ void Compiler::setup (char *src_code)
         RULE (AND, &Compiler::parse_logical, PREC_LOGICAL, NULL, PREC_NONE);
         RULE (OR, &Compiler::parse_logical, PREC_LOGICAL, NULL, PREC_NONE);
 
+        /**
+         * Primary tokens
+         */
         RULE (LPAREN, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (INT, NULL, PREC_PRIMARY, &Compiler::parse_primary, PREC_PRIMARY);
         RULE (FLOAT, NULL, PREC_NONE, &Compiler::parse_unary, PREC_PRIMARY);
@@ -71,22 +91,28 @@ void Compiler::setup (char *src_code)
         NONE_RULE (SEMICOLON);
         NONE_RULE (RPAREN);
         NONE_RULE (END);
+#undef NONE_RULE
+#undef RULE
 }
 
 void Compiler::highlight_line (struct token t)
 {
+        // print the line number pipe symbol seperator
         fprintf (stderr, "\t|\n");
-        fprintf (stderr, " %d\t| ", t.line);
+        fprintf (stderr, " %lu\t| ", t.line);
 
         char *curr = t.code_line;
 
+        // print the offending line of code
         for (int i = 0; *curr != '\n' && *curr != '\0'; i++, curr++) {
                 fputc (*curr, stderr);
         }
 
         fprintf (stderr, "\n\t|");
         curr = t.code_line;
-        for (int i = 0; *curr != '\n' && *curr != '\0'; i++, curr++) {
+
+        // beneath the code, print the arrow/underline
+        for (size_t i = 0; *curr != '\n' && *curr != '\0'; i++, curr++) {
                 if (i < t.col)
                         fputc (' ', stderr);
                 else if (t.col <= i && i < t.col + t.len)
@@ -187,16 +213,19 @@ void Compiler::parse_primary ()
                 char variable_name[token.len + 1] = { '\0' };
                 strncpy (variable_name, token.name, token.len);
 
+                if (this->match (EQUAL)) {
+                        this->parse_precedence (PRECEDENCE_GREATER_THAN (EQUAL));
+                        this->bytecode->emit_op (OPSTORE);
+                        this->bytecode->write_uint32 (offset);
+                        return;
+                }
+
                 if (offset == -1) {
                         this->parse_error ("undeclared variable %s\n", token, variable_name);
                         return;
                 }
 
-                if (this->match (EQUAL)) {
-                        this->parse_precedence (PRECEDENCE_GREATER_THAN (EQUAL));
-                        this->bytecode->emit_op (OPSTORE);
-                        this->bytecode->write_uint32 (offset);
-                } else if (this->match (PLUS_EQUAL)) {
+                if (this->match (PLUS_EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (PLUS_EQUAL));
                         this->bytecode->emit_op (OPLOAD);
                         this->bytecode->write_uint32 (offset);
@@ -287,7 +316,7 @@ void Compiler::consume (enum token_t t, const char *error_message, ...)
 
         va_list args;
         va_start (args, error_message);
-        fprintf (stderr, "[error on line %d:%d] ", this->curr_token.line, this->curr_token.col);
+        fprintf (stderr, "[error on line %lu:%lu] ", this->curr_token.line, this->curr_token.col);
         vfprintf (stderr, error_message, args);
         va_end (args);
         fputc ('\n', stderr);
@@ -300,7 +329,7 @@ void Compiler::parse_error (const char *error, struct token t, ...)
         this->has_error = true;
         va_list args;
         va_start (args, t);
-        fprintf (stderr, "[error on line %d:%d] ", t.line, t.col);
+        fprintf (stderr, "[error on line %lu:%lu] ", t.line, t.col);
         vfprintf (stderr, error, args);
         va_end (args);
         this->highlight_line (t);
@@ -406,18 +435,21 @@ void Compiler::parse_condition ()
 
         this->consume (LPAREN, "expected '(' after if keyword");
 
+        // parse if condition
         this->parse_expression ();
 
         this->consume (RPAREN, "expected ')' after if condition");
 
         size_t offset_false = this->bytecode->emit_jump_false ();
 
+        // parse if body
         this->parse_statement ();
 
         size_t offset_true = this->bytecode->emit_jump ();
 
         this->bytecode->patch_jump (offset_false);
 
+        // check if there is an else clause, parse if so..
         if (this->match (ELSE)) {
                 this->parse_statement ();
         }

@@ -37,13 +37,13 @@ void Bytecode::resize_chunk (size_t min_size)
  */
 size_t Bytecode::write_uint8 (uint8_t sh)
 {
-        if (this->count + 1 >= this->capacity)
-                this->resize_chunk (this->count + 2);
+        if (this->count + sizeof (uint8_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (uint8_t));
 
         WRITE_INT (uint8_t, this->count, sh);
-        this->count++;
+        this->count += sizeof (uint8_t);
 
-        return this->count - 1;
+        return this->count - sizeof (uint8_t);
 }
 
 /**
@@ -51,13 +51,13 @@ size_t Bytecode::write_uint8 (uint8_t sh)
  */
 size_t Bytecode::write_uint16 (uint16_t sh)
 {
-        if (this->count + 2 >= this->capacity)
-                this->resize_chunk (this->count + 2);
+        if (this->count + sizeof (uint16_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (uint16_t));
 
         WRITE_INT (uint16_t, this->count, sh);
-        this->count += 2;
+        this->count += sizeof (uint16_t);
 
-        return this->count - 2;
+        return this->count - sizeof (uint16_t);
 }
 
 /**
@@ -65,24 +65,24 @@ size_t Bytecode::write_uint16 (uint16_t sh)
  */
 size_t Bytecode::write_uint32 (uint32_t sh)
 {
-        if (this->count + 4 >= this->capacity)
-                this->resize_chunk (this->count + 4);
+        if (this->count + sizeof (uint32_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof (uint32_t));
 
         WRITE_INT (uint32_t, this->count, sh);
-        this->count += 4;
+        this->count += sizeof (uint32_t);
 
-        return this->count - 4;
+        return this->count - sizeof (uint32_t);
 }
 
 size_t Bytecode::write_uint64 (uint64_t sh)
 {
-        if (this->count + 8 >= this->capacity)
-                this->resize_chunk (this->count + 8);
+        if (this->count + sizeof(uint64_t) >= this->capacity)
+                this->resize_chunk (this->count + sizeof(uint64_t));
 
         WRITE_INT (uint64_t, this->count, sh);
-        this->count += 8;
+        this->count += sizeof (uint64_t);
 
-        return this->count - 8;
+        return this->count - sizeof (uint64_t);;
 }
 
 /**

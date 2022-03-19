@@ -14,12 +14,15 @@ Symbols::Symbols (Symbols *prev_scope, size_t local_offset, long scope_level)
 
 int Symbols::get_stack_offset (char *variable_name, size_t len)
 {
-        if (!this->has_symbol (variable_name, len))
+        if (this->has_symbol (variable_name, len)) {
+                std::string s = this->convert_to_string (variable_name, len);
+                return this->offsets[s];
+        }
+
+        if (!this->prev_scope)
                 return -1;
 
-        std::string s = this->convert_to_string (variable_name, len);
-
-        return this->offsets[s];
+        return this->prev_scope->get_stack_offset (variable_name, len);
 }
 
 bool Symbols::declare_local_variable (char *variable_name, size_t len)
