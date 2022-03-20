@@ -236,7 +236,7 @@ void Compiler::parse_function_statement ()
         } while (this->match (COMMA));
 
         for (int i = args_idx - 1; i >= 0; i--) {
-                this->symbols->declare_function_parameter (args_list[args_idx].name, args_list[args_idx].len);
+                this->symbols->declare_function_parameter (args_list[i].name, args_list[i].len);
         }
 
         this->consume (RPAREN, "expected ')' after function argument list");
@@ -245,10 +245,20 @@ void Compiler::parse_function_statement ()
         Function *old_function = this->function;
         this->function = new Function (func_name.name);
 
+        this->function->bytecode->emit_op (OPPUSHBP);
+        this->function->bytecode->emit_op (OPPUSHSP);
+        this->function->bytecode->emit_op (OPSTOREBP);
+
         while (!this->match (RBRACE)) {
                 this->parse_statement ();
         }
 
+        int var_count = this->symbols->get_symbols_count ();
+
+        while (var_count-- > 0) {
+                this->function->bytecode->emit_op (OPPOP);
+        }
+        this->function->bytecode->emit_op (OPSTOREBP);
         this->functions.push_back (this->function);
         this->function = old_function;
         this->symbols = this->symbols->pop_scope ();
@@ -261,7 +271,7 @@ void Compiler::parse_primary ()
         if (this->match (IDENTIFIER)) {
                 if (this->match (EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (EQUAL));
-                        int offset = this->symbols->get_stack_offset (token.name, token.len);
+                        int32_t offset = this->symbols->get_stack_offset (token.name, token.len);
 
                         if (this->symbols->is_declared (token.name, token.len)) {
                                 this->function->bytecode->emit_op (OPSTORE);
@@ -280,7 +290,7 @@ void Compiler::parse_primary ()
                         return;
                 }
 
-                int offset = this->symbols->get_stack_offset (token.name, token.len);
+                int32_t offset = this->symbols->get_stack_offset (token.name, token.len);
 
                 if (this->match (PLUS_EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (PLUS_EQUAL));
@@ -578,19 +588,18 @@ Bytecode *Compiler::link ()
 {
         Bytecode *compiled_code = new Bytecode ();
 
-        while (this->functions.size() != 0) {
+        while (this->functions.size () != 0) {
+                Function *f = this->functions.back ();
+                this->functions.pop_back ();
 
-                Function * f = this->functions.back();
-                this->functions.pop_back();
+                f->set_entry_address (compiled_code->address ());
 
-                f->set_entry_address(compiled_code->address());
-
-                compiled_code->import(f->bytecode->chunk, f->bytecode->count);
+                compiled_code->import (f->bytecode->chunk, f->bytecode->count);
         }
 
-        this->function->set_entry_address(compiled_code->address());
+        this->function->set_entry_address (compiled_code->address ());
 
-        compiled_code->import(this->function->bytecode->chunk, this->function->bytecode->count);
+        compiled_code->import (this->function->bytecode->chunk, this->function->bytecode->count);
 
         return compiled_code;
 }
@@ -609,5 +618,5 @@ Bytecode *Compiler::compile ()
         if (this->has_error)
                 return NULL;
 
-        return this->link();
+        return this->link ();
 }

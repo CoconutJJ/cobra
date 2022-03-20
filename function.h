@@ -10,7 +10,7 @@ class Function {
         Function(char *name);
         Bytecode *bytecode;
         char *name;
-
+        size_t entry_address;
         void set_entry_address(size_t address);
 
 };

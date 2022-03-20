@@ -182,15 +182,15 @@ struct token Scanner::scan_token ()
                 t.col = this->col_no;
                 t.code_line = this->curr_line;
                 switch (c) {
-                case '+': t.type = PLUS; break;
-                case '-': t.type = MINUS; break;
-                case '*': t.type = MULT; break;
+                case '+': t.type = this->match ('=') ? PLUS_EQUAL : PLUS; break;
+                case '-': t.type = this->match ('=') ? MINUS_EQUAL : MINUS; break;
+                case '*': t.type = this->match ('=') ? MULT_EQUAL : MULT; break;
                 case '/': {
                         if (this->match ('/')) {
                                 this->skip_comment ();
                                 continue;
                         }
-                        t.type = DIV;
+                        t.type = this->match ('=') ? DIV_EQUAL : DIV;
                         t.len = 1;
                         break;
                 }

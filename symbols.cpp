@@ -5,14 +5,14 @@
 Symbols::Symbols (Symbols *prev_scope, size_t local_offset, long scope_level)
 {
         this->local_offset = local_offset;
-        this->param_offset = 0;
+        this->param_offset = 1;
         this->scope_level = scope_level;
         this->next_scope = NULL;
         this->prev_scope = prev_scope;
-        this->offsets = std::unordered_map<std::string, long>{};
+        this->offsets = std::unordered_map<std::string, int32_t>{};
 }
 
-int Symbols::get_stack_offset (char *variable_name, size_t len)
+int32_t Symbols::get_stack_offset (char *variable_name, size_t len)
 {
         if (this->has_symbol (variable_name, len)) {
                 std::string s = this->convert_to_string (variable_name, len);

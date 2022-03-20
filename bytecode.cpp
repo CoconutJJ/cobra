@@ -143,7 +143,7 @@ void Bytecode::dump_bytecode ()
                 case OPJMPFALSE:
                 case OPSTORE:
                 case OPLOAD:
-                case OPPUSH: printf ("%" PRIi32 "\n", AS_INT32 (&this->chunk[c])); break;
+                case OPPUSH: printf ("%d\n", AS_INT32 (&this->chunk[c])); break;
                 default: printf ("\n"); continue;
                 }
                 c += sizeof (int32_t);
@@ -207,7 +207,10 @@ const char *Bytecode::get_op_name (enum OpCode op)
         case OPPOP: return "OPPOP";
         case OPCALL: return "OPCALL";
         case OPHALT: return "OPHALT";
-        case OPBP: return "OPBP";
+        case OPSTOREBP: return "OPSTOREBP";
+        case OPPUSHBP: return "OPPUSHBP";
+        case OPSTORESP: return "OPSTORESP";
+        case OPPUSHSP: return "OPPUSHSP";
         default: return "UNKNOWN_OP";
         }
 }
