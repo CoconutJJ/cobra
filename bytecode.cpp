@@ -84,7 +84,6 @@ size_t Bytecode::write_int64 (int64_t sh)
         this->count += sizeof (int64_t);
 
         return this->count - sizeof (int64_t);
-        ;
 }
 
 /**
@@ -143,10 +142,13 @@ void Bytecode::dump_bytecode ()
                 case OPJMPFALSE:
                 case OPSTORE:
                 case OPLOAD:
-                case OPPUSH: printf ("%d\n", AS_INT32 (&this->chunk[c])); break;
+                case OPPUSH: {
+                        printf ("%d\n", AS_INT32 (&this->chunk[c]));
+                        c += sizeof (int32_t);
+                        break;
+                }
                 default: printf ("\n"); continue;
                 }
-                c += sizeof (int32_t);
         }
 }
 
@@ -159,29 +161,26 @@ void Bytecode::set_address_offset (size_t offset)
 
                 switch (op) {
                 case OPJMPFALSE:
-                case OPCALL:
                 case OPJMP: {
                         int32_t old_offset = AS_INT32 (&this->chunk[c]);
                         WRITE_INT (int32_t, c, old_offset - this->address_offset + offset);
                         c += sizeof (int32_t);
                         break;
                 }
-                default: continue; break;
+                default: continue;
                 }
         }
 }
 
-void Bytecode::import(int8_t *bytecode, size_t size) {
-
-        this->resize_chunk(this->capacity + size);
+void Bytecode::import (int8_t *bytecode, size_t size)
+{
+        this->resize_chunk (this->count + size);
 
         while (size > 0) {
                 this->chunk[this->count++] = *bytecode;
                 bytecode++;
                 size--;
         }
-
-
 }
 
 const char *Bytecode::get_op_name (enum OpCode op)
@@ -211,6 +210,7 @@ const char *Bytecode::get_op_name (enum OpCode op)
         case OPPUSHBP: return "OPPUSHBP";
         case OPSTORESP: return "OPSTORESP";
         case OPPUSHSP: return "OPPUSHSP";
+        case OPRET: return "OPRET";
         default: return "UNKNOWN_OP";
         }
 }

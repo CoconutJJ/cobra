@@ -169,7 +169,6 @@ void Scanner::highlight_line (size_t start_col, size_t end_col)
 struct token Scanner::scan_token ()
 {
         struct token t;
-
         for (;;) {
                 if (this->at_end ())
                         return (struct token){ .type = END };

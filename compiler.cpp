@@ -71,15 +71,25 @@ void Compiler::setup (char *src_code)
          */
         RULE (PLUS, &Compiler::parse_terms, PREC_TERM, NULL, PREC_NONE);
         RULE (MINUS, &Compiler::parse_terms, PREC_TERM, &Compiler::parse_unary, PREC_UNARY);
+
         RULE (MULT, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_NONE);
         RULE (DIV, &Compiler::parse_products, PREC_PRODUCT, NULL, PREC_PRODUCT);
-        RULE (LT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
-        RULE (GT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
-        RULE (LTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
-        RULE (GTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+
         RULE (AND, &Compiler::parse_logical, PREC_LOGICAL, NULL, PREC_NONE);
         RULE (OR, &Compiler::parse_logical, PREC_LOGICAL, NULL, PREC_NONE);
+
+        RULE (LT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (LTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+
+        RULE (GT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (GTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+
         RULE (EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+        RULE (PLUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+        RULE (MINUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+        RULE (MULT_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+        RULE (DIV_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+
         /**
          * Primary tokens
          */
@@ -88,15 +98,16 @@ void Compiler::setup (char *src_code)
         RULE (FLOAT, NULL, PREC_NONE, &Compiler::parse_unary, PREC_PRIMARY);
         RULE (IDENTIFIER, NULL, PREC_NONE, &Compiler::parse_primary, PREC_PRIMARY);
 
-        NONE_RULE (WHILE);
+        NONE_RULE (END);
         NONE_RULE (IF);
         NONE_RULE (FOR);
         NONE_RULE (ELSE);
+        NONE_RULE (WHILE);
         NONE_RULE (LBRACE);
         NONE_RULE (RBRACE);
-        NONE_RULE (SEMICOLON);
         NONE_RULE (RPAREN);
-        NONE_RULE (END);
+        NONE_RULE (SEMICOLON);
+
 #undef NONE_RULE
 #undef RULE
 }
@@ -253,12 +264,14 @@ void Compiler::parse_function_statement ()
                 this->parse_statement ();
         }
 
-        int var_count = this->symbols->get_symbols_count ();
+        this->function->bytecode->emit_op (OPSTOREBP);
 
+        int var_count = this->symbols->get_symbols_count ();
         while (var_count-- > 0) {
                 this->function->bytecode->emit_op (OPPOP);
         }
-        this->function->bytecode->emit_op (OPSTOREBP);
+
+        this->function->bytecode->emit_op (OPRET);
         this->functions.push_back (this->function);
         this->function = old_function;
         this->symbols = this->symbols->pop_scope ();
