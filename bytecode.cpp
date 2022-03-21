@@ -2,7 +2,6 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define WRITE_INT(type, idx, val) *((type *)&this->chunk[idx]) = val
 /**
  * Allocate a buffer for the byte code
  */
@@ -128,13 +127,37 @@ void Bytecode::patch_jump (size_t offset)
         *((int32_t *)&this->chunk[offset]) = this->count;
 }
 
+bool Bytecode::instruction_at (size_t *position, enum OpCode *opcode, int32_t *arg)
+{
+        if (*position >= this->count)
+                return false;
+
+        int8_t op_byte = this->chunk[(*position)++];
+        enum OpCode op = (enum OpCode)op_byte;
+
+        *opcode = op;
+
+        switch (op) {
+        case OPJMP:
+        case OPJMPFALSE:
+        case OPSTORE:
+        case OPLOAD:
+        case OPCALL:
+        case OPPUSH: {
+                *arg = AS_INT32 (&this->chunk[*position]);
+                *position += sizeof (int32_t);
+        } break;
+        default: break;
+        }
+        return true;
+}
+
 void Bytecode::dump_bytecode ()
 {
         size_t c = 0;
-        while (c < this->count) {
-                int8_t op_byte = this->chunk[c++];
-                enum OpCode op = (enum OpCode)op_byte;
-
+        enum OpCode op;
+        int32_t arg;
+        while (this->instruction_at (&c, &op, &arg)) {
                 printf ("%" PRIu64 ": %s ", c - 1, this->get_op_name (op));
 
                 switch (op) {
@@ -142,9 +165,9 @@ void Bytecode::dump_bytecode ()
                 case OPJMPFALSE:
                 case OPSTORE:
                 case OPLOAD:
+                case OPCALL:
                 case OPPUSH: {
-                        printf ("%d\n", AS_INT32 (&this->chunk[c]));
-                        c += sizeof (int32_t);
+                        printf ("%d\n", arg);
                         break;
                 }
                 default: printf ("\n"); continue;

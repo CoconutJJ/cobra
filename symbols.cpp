@@ -6,6 +6,7 @@ Symbols::Symbols (Symbols *prev_scope, size_t local_offset, long scope_level)
 {
         this->local_offset = local_offset;
         this->param_offset = 1;
+        this->locals_count = 0;
         this->scope_level = scope_level;
         this->next_scope = NULL;
         this->prev_scope = prev_scope;
@@ -31,7 +32,7 @@ bool Symbols::declare_local_variable (char *variable_name, size_t len)
 
         this->offsets[s] = this->local_offset;
         this->local_offset += 1;
-        this->symbols_count++;
+        this->locals_count++;
         return true;
 }
 
@@ -40,7 +41,6 @@ bool Symbols::declare_function_parameter (char *variable_name, size_t len)
         std::string s = this->convert_to_string (variable_name, len);
 
         this->param_offset += 1;
-        this->symbols_count++;
         this->offsets[s] = -this->param_offset;
 
         return true;
@@ -79,9 +79,9 @@ bool Symbols::has_symbol (char *symbol, size_t len)
         return this->offsets.find (s) != this->offsets.end ();
 }
 
-int Symbols::get_symbols_count ()
+int Symbols::get_locals_count ()
 {
-        return this->symbols_count;
+        return this->locals_count;
 }
 
 Symbols *Symbols::new_scope ()

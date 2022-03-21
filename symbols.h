@@ -8,7 +8,7 @@ class Symbols {
         int32_t scope_level;
         int32_t local_offset;
         int32_t param_offset;
-        int32_t symbols_count;
+        int32_t locals_count;
         Symbols *next_scope;
         Symbols *prev_scope;
         std::unordered_map<std::string, int32_t> offsets{};
@@ -19,7 +19,7 @@ class Symbols {
         bool declare_function_parameter (char *parameter_name, size_t len);
         bool has_symbol (char *symbol, size_t len);
         bool is_declared (char *variable_name, size_t len);
-        int get_symbols_count();
+        int get_locals_count();
         Symbols *new_scope ();
         Symbols *pop_scope ();
 

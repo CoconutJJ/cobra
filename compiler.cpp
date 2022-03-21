@@ -52,8 +52,8 @@ void Compiler::setup (char *src_code)
         /*
          * setup a bytecode output buffer object, this stores our emitted bytecode.
          */
-        this->function = new Function ("script");
-
+        this->function = new Function ("script", 6);
+        this->next_placeholder_value = 0;
         /*
          * initialize a symbols object to keep track of variable names/function
          * parameters
@@ -103,6 +103,7 @@ void Compiler::setup (char *src_code)
         NONE_RULE (FOR);
         NONE_RULE (ELSE);
         NONE_RULE (WHILE);
+        NONE_RULE (FUNC);
         NONE_RULE (LBRACE);
         NONE_RULE (RBRACE);
         NONE_RULE (RPAREN);
@@ -228,6 +229,10 @@ void Compiler::parse_function_statement ()
 
         this->consume (IDENTIFIER, "expected function name after func keyword");
 
+        if (this->symbols->is_declared (func_name.name, func_name.len)) {
+                this->parse_error ("function already defined", func_name);
+        }
+
         this->consume (LPAREN, "expected '(' for function argument list");
 
         this->symbols->declare_local_variable (func_name.name, func_name.len);
@@ -254,7 +259,9 @@ void Compiler::parse_function_statement ()
         this->consume (LBRACE, "expected '{' for function body");
 
         Function *old_function = this->function;
-        this->function = new Function (func_name.name);
+        this->function = new Function (func_name.name, func_name.len);
+
+        this->symbol_to_function[this->convert_to_string (func_name.name, func_name.len)] = this->function;
 
         this->function->bytecode->emit_op (OPPUSHBP);
         this->function->bytecode->emit_op (OPPUSHSP);
@@ -264,13 +271,13 @@ void Compiler::parse_function_statement ()
                 this->parse_statement ();
         }
 
-        this->function->bytecode->emit_op (OPSTOREBP);
+        int var_count = this->symbols->get_locals_count ();
 
-        int var_count = this->symbols->get_symbols_count ();
         while (var_count-- > 0) {
                 this->function->bytecode->emit_op (OPPOP);
         }
 
+        this->function->bytecode->emit_op (OPSTOREBP);
         this->function->bytecode->emit_op (OPRET);
         this->functions.push_back (this->function);
         this->function = old_function;
@@ -328,16 +335,20 @@ void Compiler::parse_primary ()
                         this->function->bytecode->emit_op (OPSTORE);
                         this->function->bytecode->write_int32 (offset);
                 } else if (this->match (LPAREN)) {
+                        int param_count = 0;
                         do {
                                 this->parse_expression ();
+                                param_count++;
                         } while (this->match (COMMA));
 
                         this->consume (RPAREN, "expected ')' after function call");
 
-                        this->function->bytecode->emit_op (OPLOAD);
-                        this->function->bytecode->write_int32 (offset);
                         this->function->bytecode->emit_op (OPCALL);
-
+                        this->function->bytecode->write_int32 (
+                                this->resolve_function_placeholder (token.name, token.len));
+                        while (param_count-- > 0) {
+                                this->function->bytecode->emit_op (OPPOP);
+                        }
                 } else {
                         this->function->bytecode->emit_op (OPLOAD);
                         this->function->bytecode->write_int32 (offset);
@@ -455,7 +466,7 @@ void Compiler::parse_comparison ()
                 return;
         }
 
-        this->parse_precedence ((enum Precedence) ((int)this->get_binary_precedence (this->previous ()) + 1));
+        this->parse_precedence (PRECEDENCE_GREATER_THAN (this->previous ()));
 
         switch (op) {
         case GT: this->function->bytecode->emit_op (OPGT); break;
@@ -512,7 +523,7 @@ void Compiler::push_block_scope ()
 
 void Compiler::pop_block_scope ()
 {
-        int symbol_count = this->symbols->get_symbols_count ();
+        int symbol_count = this->symbols->get_locals_count ();
 
         for (int i = 0; i < symbol_count; i++) {
                 this->function->bytecode->emit_op (OPPOP);
@@ -597,15 +608,38 @@ void Compiler::parse_for ()
         this->function->bytecode->patch_jump (condition_false_offset);
 }
 
+std::string Compiler::convert_to_string (char *s, size_t len)
+{
+        char buf[len + 1] = { '\0' };
+
+        strncpy (buf, s, len);
+
+        return std::string (buf);
+}
+
+int32_t Compiler::resolve_function_placeholder (char *func_name, size_t len)
+{
+        this->call_placeholders[this->next_placeholder_value++] = this->convert_to_string (func_name, len);
+
+        return this->next_placeholder_value - 1;
+}
+
+Function *Compiler::resolve_placeholder (int32_t placeholder)
+{
+        std::string func_name = this->call_placeholders[placeholder];
+        return this->symbol_to_function[func_name];
+}
+
 Bytecode *Compiler::link ()
 {
         Bytecode *compiled_code = new Bytecode ();
 
-        while (this->functions.size () != 0) {
-                Function *f = this->functions.back ();
-                this->functions.pop_back ();
+        for (int i = 0; i < this->functions.size (); i++) {
+                Function *f = this->functions[i];
 
-                f->set_entry_address (compiled_code->address ());
+                size_t entry_address = compiled_code->address ();
+
+                f->set_entry_address (entry_address);
 
                 compiled_code->import (f->bytecode->chunk, f->bytecode->count);
         }
@@ -613,6 +647,17 @@ Bytecode *Compiler::link ()
         this->function->set_entry_address (compiled_code->address ());
 
         compiled_code->import (this->function->bytecode->chunk, this->function->bytecode->count);
+
+        size_t c = 0;
+        int32_t arg;
+        enum OpCode op;
+
+        while (compiled_code->instruction_at (&c, &op, &arg)) {
+                if (op == OPCALL) {
+                        *((int32_t *)&compiled_code->chunk[c - sizeof (int32_t)]) =
+                                (int32_t)this->resolve_placeholder (arg)->entry_address;
+                }
+        }
 
         return compiled_code;
 }

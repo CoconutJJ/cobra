@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #define AS_INT32(ptr) (*((int32_t *)ptr))
+#define WRITE_INT(type, idx, val) *((type *)&this->chunk[idx]) = val
 
 enum OpCode {
     OPADD,
@@ -53,6 +54,7 @@ class Bytecode {
         void dump_bytecode();
         void set_address_offset(size_t offset);
         void import(int8_t *bytecode, size_t size);
+        bool instruction_at(size_t *position, enum OpCode *op, int32_t *arg);
     private:
         void resize_chunk(size_t min_size);
         const char *get_op_name(enum OpCode op);
