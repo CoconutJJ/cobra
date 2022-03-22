@@ -79,17 +79,17 @@ bool Scanner::is_valid_identifier_char (char c)
 
 enum token_t Scanner::match_keyword (char *keyword, int length)
 {
-        if (strncmp (keyword, "if", length) == 0)
+        if (strncmp (keyword, "if", 2) == 0)
                 return IF;
-        if (strncmp (keyword, "else", length) == 0)
+        if (strncmp (keyword, "else", 4) == 0)
                 return ELSE;
-        if (strncmp (keyword, "while", length) == 0)
+        if (strncmp (keyword, "while", 5) == 0)
                 return WHILE;
-        if (strncmp (keyword, "for", length) == 0)
+        if (strncmp (keyword, "for", 3) == 0)
                 return FOR;
-        if (strncmp (keyword, "return", length) == 0)
+        if (strncmp (keyword, "return", 6) == 0)
                 return RETURN;
-        if (strncmp (keyword, "func", length) == 0)
+        if (strncmp (keyword, "func", 4) == 0)
                 return FUNC;
 
         return IDENTIFIER;
