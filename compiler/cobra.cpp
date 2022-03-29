@@ -7,7 +7,8 @@
 void parse_cmd (int argc, char **argv)
 {
         struct option long_options[] = {
-                {"debug", no_argument, 0, 'd'}
+                {"debug", no_argument, 0, 'd'},
+                {   NULL,           0, 0,   0}
         };
 
         int c, option_index = 0;
