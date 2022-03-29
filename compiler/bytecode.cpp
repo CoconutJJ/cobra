@@ -154,12 +154,11 @@ bool Bytecode::instruction_at (size_t *position, enum OpCode *opcode, int32_t *a
 
 void Bytecode::dump_bytecode ()
 {
+        
         size_t c = 0;
         enum OpCode op;
         int32_t arg;
         while (this->instruction_at (&c, &op, &arg)) {
-                printf ("%" PRIu64 ": %s ", c - 1, this->get_op_name (op));
-
                 switch (op) {
                 case OPJMP:
                 case OPJMPFALSE:
@@ -167,10 +166,14 @@ void Bytecode::dump_bytecode ()
                 case OPLOAD:
                 case OPCALL:
                 case OPPUSH: {
+                        printf ("%" PRIu64 ": %s ", c - 1 - sizeof (int32_t), this->get_op_name (op));
                         printf ("%d\n", arg);
                         break;
                 }
-                default: printf ("\n"); continue;
+                default:
+                        printf ("%" PRIu64 ": %s ", c - 1, this->get_op_name (op));
+                        printf ("\n");
+                        continue;
                 }
         }
 }
@@ -229,10 +232,6 @@ const char *Bytecode::get_op_name (enum OpCode op)
         case OPPOP: return "OPPOP";
         case OPCALL: return "OPCALL";
         case OPHALT: return "OPHALT";
-        case OPSTOREBP: return "OPSTOREBP";
-        case OPPUSHBP: return "OPPUSHBP";
-        case OPSTORESP: return "OPSTORESP";
-        case OPPUSHSP: return "OPPUSHSP";
         case OPRET: return "OPRET";
         default: return "UNKNOWN_OP";
         }

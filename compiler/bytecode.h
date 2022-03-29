@@ -28,11 +28,7 @@ enum OpCode {
     OPPOP,
     OPCALL,
     OPHALT,
-    OPRET,
-    OPSTOREBP,
-    OPPUSHBP,
-    OPPUSHSP,
-    OPSTORESP
+    OPRET
 };
 
 class Bytecode {

@@ -263,9 +263,7 @@ void Compiler::parse_function_statement ()
 
         this->symbol_to_function[this->convert_to_string (func_name.name, func_name.len)] = this->function;
 
-        this->function->bytecode->emit_op (OPPUSHBP);
-        this->function->bytecode->emit_op (OPPUSHSP);
-        this->function->bytecode->emit_op (OPSTOREBP);
+
 
         while (!this->match (RBRACE)) {
                 this->parse_statement ();
@@ -277,7 +275,6 @@ void Compiler::parse_function_statement ()
                 this->function->bytecode->emit_op (OPPOP);
         }
 
-        this->function->bytecode->emit_op (OPSTOREBP);
         this->function->bytecode->emit_op (OPRET);
         this->functions.push_back (this->function);
         this->function = old_function;
