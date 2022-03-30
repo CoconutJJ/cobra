@@ -17,7 +17,7 @@ VM::VM ()
         this->frame_no = 0;
 }
 
-void VM::assert_valid_stack_location (char *prefix, void *ptr)
+void VM::assert_valid_stack_location (const char *prefix, void *ptr)
 {
         if (ptr > this->stack + STACK_SIZE) {
                 fprintf (stderr, "error: stack overflow: %s", prefix);

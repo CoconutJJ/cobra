@@ -15,7 +15,7 @@ Symbols::Symbols (Symbols *prev_scope, size_t local_offset, long scope_level)
 
 int32_t Symbols::get_stack_offset (char *variable_name, size_t len)
 {
-        if (this->has_symbol (variable_name, len)) {
+        if (this->has_variable (variable_name, len)) {
                 std::string s = this->convert_to_string (variable_name, len);
                 return this->offsets[s];
         }
@@ -33,6 +33,15 @@ bool Symbols::declare_local_variable (char *variable_name, size_t len)
         this->offsets[s] = this->local_offset;
         this->local_offset += 1;
         this->locals_count++;
+        return true;
+}
+
+bool Symbols::declare_function (char *func_name, size_t len)
+{
+        std::string s = this->convert_to_string (func_name, len);
+
+        this->functions.insert (s);
+
         return true;
 }
 
@@ -62,21 +71,41 @@ std::string Symbols::convert_to_string (char *str, size_t len)
         return s;
 }
 
-bool Symbols::is_declared (char *variable_name, size_t len) {
+bool Symbols::variable_declared (char *variable_name, size_t len)
+{
+        if (this->has_variable (variable_name, len))
+                return true;
 
-        if (this->has_symbol(variable_name, len)) return true;
+        if (!this->prev_scope)
+                return false;
 
-        if (!this->prev_scope) return false;
-
-        return this->prev_scope->is_declared(variable_name, len);
-
+        return this->prev_scope->variable_declared (variable_name, len);
 }
 
-bool Symbols::has_symbol (char *symbol, size_t len)
+bool Symbols::function_declared (char *func_name, size_t len)
+{
+        if (this->has_function (func_name, len))
+                return true;
+
+        if (!this->prev_scope)
+                return false;
+
+        return this->prev_scope->function_declared (func_name, len);
+}
+
+
+bool Symbols::has_function (char *func_name, size_t len)
+{
+        std::string s = this->convert_to_string(func_name, len);
+
+        return this->functions.find(s) != this->functions.end();
+}
+
+bool Symbols::has_variable (char *symbol, size_t len)
 {
         std::string s = this->convert_to_string (symbol, len);
 
-        return this->offsets.find (s) != this->offsets.end ();
+        return (this->offsets.find (s) != this->offsets.end ());
 }
 
 int Symbols::get_locals_count ()

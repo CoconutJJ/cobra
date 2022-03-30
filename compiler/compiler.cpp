@@ -1,9 +1,11 @@
 #include "compiler.h"
 #include "scanner.h"
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
+
 Compiler::Compiler (char *src_code)
 {
         this->setup (src_code);
@@ -52,8 +54,9 @@ void Compiler::setup (char *src_code)
         /*
          * setup a bytecode output buffer object, this stores our emitted bytecode.
          */
-        this->function = new Function ("script", 6);
+        this->function = new Function ("script", 6, (struct token){ 0 });
         this->next_placeholder_value = 0;
+
         /*
          * initialize a symbols object to keep track of variable names/function
          * parameters
@@ -85,8 +88,10 @@ void Compiler::setup (char *src_code)
         RULE (GTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
 
         RULE (EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+
         RULE (PLUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
         RULE (MINUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
+
         RULE (MULT_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
         RULE (DIV_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
 
@@ -162,6 +167,9 @@ enum Precedence Compiler::get_unary_precedence (enum token_t t)
 
 bool Compiler::match (enum token_t t)
 {
+        if (this->has_error)
+                exit (EXIT_FAILURE);
+
         if (this->curr_token.type == t) {
                 this->advance ();
                 return true;
@@ -229,13 +237,13 @@ void Compiler::parse_function_statement ()
 
         this->consume (IDENTIFIER, "expected function name after func keyword");
 
-        if (this->symbols->is_declared (func_name.name, func_name.len)) {
+        if (this->symbols->has_function (func_name.name, func_name.len)) {
                 this->parse_error ("function already defined", func_name);
         }
 
         this->consume (LPAREN, "expected '(' for function argument list");
 
-        this->symbols->declare_local_variable (func_name.name, func_name.len);
+        this->symbols->declare_function (func_name.name, func_name.len);
 
         this->symbols = this->symbols->new_scope ();
 
@@ -259,11 +267,9 @@ void Compiler::parse_function_statement ()
         this->consume (LBRACE, "expected '{' for function body");
 
         Function *old_function = this->function;
-        this->function = new Function (func_name.name, func_name.len);
+        this->function = new Function (func_name.name, func_name.len, func_name);
 
         this->symbol_to_function[this->convert_to_string (func_name.name, func_name.len)] = this->function;
-
-
 
         while (!this->match (RBRACE)) {
                 this->parse_statement ();
@@ -281,16 +287,45 @@ void Compiler::parse_function_statement ()
         this->symbols = this->symbols->pop_scope ();
 }
 
+Function *Compiler::find_function_by_name (char *func_name, size_t len)
+{
+        for (Function *f : this->functions) {
+                if (strncmp (f->name, func_name, len) == 0)
+                        return f;
+        }
+        return NULL;
+}
+
+void Compiler::variable_check_before_assignment (char *variable_name,
+                                                 size_t len,
+                                                 struct token var,
+                                                 struct token assign_op)
+{
+        if (!this->symbols->variable_declared (variable_name, len)) {
+                this->parse_error ("undefined variable:", var, var.name);
+
+                if (this->symbols->function_declared (variable_name, len)) {
+                        this->parse_error ("is a function defined here: ",
+                                           this->find_function_by_name (variable_name, len)->f);
+
+                        // this->parse_error("cannot use %s as `%s` operator lvalue", assign_op, var.name,
+                        // assign_op.name);
+                }
+        }
+}
+
 void Compiler::parse_primary ()
 {
         struct token token = this->peek_token ();
 
         if (this->match (IDENTIFIER)) {
+                struct token op = this->peek_token ();
+
                 if (this->match (EQUAL)) {
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (EQUAL));
                         int32_t offset = this->symbols->get_stack_offset (token.name, token.len);
 
-                        if (this->symbols->is_declared (token.name, token.len)) {
+                        if (this->symbols->variable_declared (token.name, token.len)) {
                                 this->function->bytecode->emit_op (OPSTORE);
                                 this->function->bytecode->write_int32 (offset);
                         } else {
@@ -300,16 +335,10 @@ void Compiler::parse_primary ()
                         return;
                 }
 
-                if (!this->symbols->is_declared (token.name, token.len)) {
-                        char variable_name[token.len + 1] = { '\0' };
-                        strncpy (variable_name, token.name, token.len);
-                        this->parse_error ("undeclared variable %s\n", token, variable_name);
-                        return;
-                }
-
                 int32_t offset = this->symbols->get_stack_offset (token.name, token.len);
 
                 if (this->match (PLUS_EQUAL)) {
+                        this->variable_check_before_assignment (token.name, token.len, token, op);
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (PLUS_EQUAL));
                         this->function->bytecode->emit_op (OPLOAD);
                         this->function->bytecode->write_int32 (offset);
@@ -317,6 +346,7 @@ void Compiler::parse_primary ()
                         this->function->bytecode->emit_op (OPSTORE);
                         this->function->bytecode->write_int32 (offset);
                 } else if (this->match (MINUS_EQUAL)) {
+                        this->variable_check_before_assignment (token.name, token.len, token, op);
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (MINUS_EQUAL));
                         this->function->bytecode->emit_op (OPNEG);
                         this->function->bytecode->emit_op (OPLOAD);
@@ -325,6 +355,7 @@ void Compiler::parse_primary ()
                         this->function->bytecode->emit_op (OPSTORE);
                         this->function->bytecode->write_int32 (offset);
                 } else if (this->match (MULT_EQUAL)) {
+                        this->variable_check_before_assignment (token.name, token.len, token, op);
                         this->parse_precedence (PRECEDENCE_GREATER_THAN (MULT_EQUAL));
                         this->function->bytecode->emit_op (OPLOAD);
                         this->function->bytecode->write_int32 (offset);
@@ -339,6 +370,11 @@ void Compiler::parse_primary ()
                         } while (this->match (COMMA));
 
                         this->consume (RPAREN, "expected ')' after function call");
+
+                        if (offset != -1) {
+                                this->parse_error ("attempting to call non-function value", token);
+                                return;
+                        }
 
                         this->function->bytecode->emit_op (OPCALL);
                         this->function->bytecode->write_int32 (
@@ -431,9 +467,9 @@ void Compiler::parse_error (const char *error, struct token t, ...)
         va_start (args, t);
         fprintf (stderr, "[error on line %lu:%lu] ", t.line, t.col);
         vfprintf (stderr, error, args);
+        fputc('\n', stderr);
         va_end (args);
         this->highlight_line (t);
-        exit (EXIT_FAILURE);
 }
 
 void Compiler::parse_block ()
@@ -629,7 +665,7 @@ Function *Compiler::resolve_placeholder (int32_t placeholder)
 
 Function *Compiler::link ()
 {
-        for (int i = 0; i < this->functions.size (); i++) {
+        for (size_t i = 0; i < this->functions.size (); i++) {
                 Function *f = this->functions[i];
 
                 size_t entry_address = this->function->bytecode->address ();
@@ -638,7 +674,6 @@ Function *Compiler::link ()
 
                 this->function->bytecode->import (f->bytecode->chunk, f->bytecode->count);
         }
-
 
         size_t c = 0;
         int32_t arg;

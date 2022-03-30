@@ -23,7 +23,7 @@ class VM {
         int32_t frame_no;
         int32_t *stack_frames[FRAME_SIZE];
 
-        void assert_valid_stack_location (char *prefix, void *ptr);
+        void assert_valid_stack_location (const char *prefix, void *ptr);
 
         int32_t read_int32 ();
         enum OpCode read_op ();

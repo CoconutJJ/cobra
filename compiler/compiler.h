@@ -45,11 +45,11 @@ class Compiler {
 
     private:
         std::unordered_map<int32_t, std::string> call_placeholders;
-        std::unordered_map<std::string, Function*> symbol_to_function;
+        std::unordered_map<std::string, Function *> symbol_to_function;
 
         int32_t next_placeholder_value;
-        int32_t resolve_function_placeholder(char *func_name, size_t len);
-        Function *resolve_placeholder(int32_t placeholder);
+        int32_t resolve_function_placeholder (char *func_name, size_t len);
+        Function *resolve_placeholder (int32_t placeholder);
         void add_symbol (char *symbol, size_t len, size_t address);
 
         std::string convert_to_string (char *s, size_t len);
@@ -76,6 +76,8 @@ class Compiler {
         void advance ();
         void consume (enum token_t t, const char *error_message, ...);
 
+        void variable_check_before_assignment (char *variable_name, size_t len, struct token token, struct token assign_op);
+        Function *find_function_by_name(char *func_name, size_t len);
         void parse_statement ();
 
         void parse_condition ();

@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void compile (char *filename, char *outfile)
+void compile (const char *filename, const char *outfile)
 {
         FILE *fp = fopen (filename, "r");
 
