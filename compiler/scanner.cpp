@@ -69,7 +69,7 @@ bool Scanner::is_alpha (char c)
 
 bool Scanner::is_numeric (char c)
 {
-        return '0' <= c && c <= '9';
+        return ('0' <= c && c <= '9');
 }
 
 bool Scanner::is_valid_identifier_char (char c)

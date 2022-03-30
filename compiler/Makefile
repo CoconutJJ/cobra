@@ -1,10 +1,10 @@
 CC=g++
-OBJ=bytecode.o compiler.o scanner.o symbols.o cobra.o function.o
+OBJ=bytecode.o compiler.o scanner.o symbols.o cobra.o function.o vm.o
 FLAGS=-Ofast -s -Wall
 
 all: cobrac clean
 debug: FLAGS=-Og -g -Wall
-debug: cobra clean
+debug: cobrac clean
 cobrac: $(OBJ)
 	$(CC) $(FLAGS) $(OBJ) -o cobrac
 
@@ -15,4 +15,3 @@ cobrac: $(OBJ)
 
 clean:
 	rm $(OBJ)	
-

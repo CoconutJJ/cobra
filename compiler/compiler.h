@@ -40,8 +40,8 @@ class Compiler {
         Compiler (char *src_code);
         Compiler (FILE *source_fp);
         ~Compiler ();
-        Bytecode *compile ();
-        Bytecode *link ();
+        Function *compile ();
+        Function *link ();
 
     private:
         std::unordered_map<int32_t, std::string> call_placeholders;

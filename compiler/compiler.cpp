@@ -627,39 +627,34 @@ Function *Compiler::resolve_placeholder (int32_t placeholder)
         return this->symbol_to_function[func_name];
 }
 
-Bytecode *Compiler::link ()
+Function *Compiler::link ()
 {
-        Bytecode *compiled_code = new Bytecode ();
-
         for (int i = 0; i < this->functions.size (); i++) {
                 Function *f = this->functions[i];
 
-                size_t entry_address = compiled_code->address ();
+                size_t entry_address = this->function->bytecode->address ();
 
                 f->set_entry_address (entry_address);
 
-                compiled_code->import (f->bytecode->chunk, f->bytecode->count);
+                this->function->bytecode->import (f->bytecode->chunk, f->bytecode->count);
         }
 
-        this->function->set_entry_address (compiled_code->address ());
-
-        compiled_code->import (this->function->bytecode->chunk, this->function->bytecode->count);
 
         size_t c = 0;
         int32_t arg;
         enum OpCode op;
 
-        while (compiled_code->instruction_at (&c, &op, &arg)) {
+        while (this->function->bytecode->instruction_at (&c, &op, &arg)) {
                 if (op == OPCALL) {
-                        *((int32_t *)&compiled_code->chunk[c - sizeof (int32_t)]) =
+                        *((int32_t *)&this->function->bytecode->chunk[c - sizeof (int32_t)]) =
                                 (int32_t)this->resolve_placeholder (arg)->entry_address;
                 }
         }
 
-        return compiled_code;
+        return this->function;
 }
 
-Bytecode *Compiler::compile ()
+Function *Compiler::compile ()
 {
         while (!this->match (END)) {
                 this->parse_statement ();

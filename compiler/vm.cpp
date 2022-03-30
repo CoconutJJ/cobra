@@ -1,4 +1,6 @@
-#include "../compiler/bytecode.h"
+#include "vm.h"
+#include "bytecode.h"
+#include "function.h"
 #include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,78 +9,72 @@
 #define STACK_SIZE 1024
 #define FRAME_SIZE 1024
 #define CODE_SIZE  1024
-struct VM {
-        int8_t *ip;
-        int8_t instructions[CODE_SIZE];
 
-        int32_t *sp;
-        int32_t *bp;
-        int32_t stack[STACK_SIZE];
-
-        int32_t frame_no;
-        int32_t *stack_frames[FRAME_SIZE];
-};
-
-struct VM vm;
-
-void assert_valid_stack_location (char *prefix, void *ptr)
+VM::VM ()
 {
-        if (ptr > vm.stack + STACK_SIZE) {
+        this->ip = NULL;
+        this->bp = NULL;
+        this->frame_no = 0;
+}
+
+void VM::assert_valid_stack_location (char *prefix, void *ptr)
+{
+        if (ptr > this->stack + STACK_SIZE) {
                 fprintf (stderr, "error: stack overflow: %s", prefix);
                 exit (EXIT_FAILURE);
-        } else if (ptr < vm.stack) {
+        } else if (ptr < this->stack) {
                 fprintf (stderr, "error: stack underflow: %s", prefix);
                 exit (EXIT_FAILURE);
         }
 }
 
-int32_t read_int32 ()
+int32_t VM::read_int32 ()
 {
-        int32_t value = *(int32_t *)vm.ip;
-        vm.ip += sizeof (int32_t);
+        int32_t value = *(int32_t *)this->ip;
+        this->ip += sizeof (int32_t);
         return value;
 }
 
-enum OpCode read_op ()
+enum OpCode VM::read_op ()
 {
-        int8_t op = *vm.ip;
-        vm.ip += sizeof (int8_t);
+        int8_t op = *this->ip;
+        this->ip += sizeof (int8_t);
 
         return (enum OpCode)op;
 }
 
-int32_t pop ()
+int32_t VM::pop ()
 {
-        vm.sp -= sizeof (int32_t);
+        this->sp -= 1;
 
-        assert_valid_stack_location ("pop: attempted to pop stack with invalid VM configuration", vm.sp);
+        this->assert_valid_stack_location ("pop: attempted to pop stack with invalid VM configuration", this->sp);
 
-        return *vm.sp;
+        return *this->sp;
 }
 
-void push (int32_t v)
+void VM::push (int32_t v)
 {
-        *vm.sp = v;
-        vm.sp += sizeof (int32_t);
-        assert_valid_stack_location ("push: attempted to push stack with invalid VM configuration", vm.sp);
+        *this->sp = v;
+        this->sp += 1;
+        assert_valid_stack_location ("push: attempted to push stack with invalid VM configuration", this->sp);
 }
 
-void add_op ()
+void VM::add_op ()
 {
         push (pop () + pop ());
 }
 
-void neg_op ()
+void VM::neg_op ()
 {
         push (-pop ());
 }
 
-void mult_op ()
+void VM::mult_op ()
 {
         push (pop () * pop ());
 }
 
-void div_op ()
+void VM::div_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -86,7 +82,7 @@ void div_op ()
         push (a / b);
 }
 
-void mod_op ()
+void VM::mod_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -94,7 +90,7 @@ void mod_op ()
         push (a % b);
 }
 
-void eq_op ()
+void VM::eq_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -102,7 +98,7 @@ void eq_op ()
         push (a == b);
 }
 
-void gt_op ()
+void VM::gt_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -110,7 +106,7 @@ void gt_op ()
         push (a > b);
 }
 
-void lt_op ()
+void VM::lt_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -118,7 +114,7 @@ void lt_op ()
         push (a < b);
 }
 
-void gteq_op ()
+void VM::gteq_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -126,7 +122,7 @@ void gteq_op ()
         push (a >= b);
 }
 
-void lteq_op ()
+void VM::lteq_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -134,7 +130,7 @@ void lteq_op ()
         push (a <= b);
 }
 
-void and_op ()
+void VM::and_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -142,7 +138,7 @@ void and_op ()
         push (a && b);
 }
 
-void or_op ()
+void VM::or_op ()
 {
         int32_t b = pop ();
         int32_t a = pop ();
@@ -150,60 +146,60 @@ void or_op ()
         push (a || b);
 }
 
-void jmp_op ()
+void VM::jmp_op ()
 {
-        vm.ip = (int8_t *)(vm.instructions + read_int32 ());
+        this->ip = (int8_t *)(this->instructions + read_int32 ());
 }
 
-void jmpfalse_op ()
+void VM::jmpfalse_op ()
 {
         int32_t addr = read_int32 ();
         if (!pop ())
-                vm.ip = (int8_t *)(vm.instructions + addr);
+                this->ip = (int8_t *)(this->instructions + addr);
 }
 
-void store_op ()
+void VM::store_op ()
 {
         int32_t offset = read_int32 ();
         int32_t value = pop ();
 
-        int32_t *store_location = vm.bp + offset;
+        int32_t *store_location = this->bp + offset;
 
-        assert_valid_stack_location("store: attempted to store with invalid VM configuration", store_location);
+        assert_valid_stack_location ("store: attempted to store with invalid VM configuration", store_location);
 
         *store_location = value;
 }
 
-void load_op ()
+void VM::load_op ()
 {
         int32_t offset = read_int32 ();
 
-        int32_t *load_location = vm.bp + offset;
+        int32_t *load_location = this->bp + offset;
 
-        assert_valid_stack_location("load: attempted to load with invalid VM configuration", load_location);
+        assert_valid_stack_location ("load: attempted to load with invalid VM configuration", load_location);
 
         push (*load_location);
 }
 
-void call_op ()
+void VM::call_op ()
 {
         int32_t addr = read_int32 ();
 
-        push (vm.ip - vm.instructions);
-        vm.stack_frames[vm.frame_no++] = vm.bp;
-        vm.bp = (int32_t *)vm.ip;
-        vm.ip = vm.instructions + addr;
+        push (this->ip - this->instructions);
+        this->stack_frames[this->frame_no++] = this->bp;
+        this->bp = this->sp;
+        this->ip = this->instructions + addr;
 }
 
-void ret_op ()
+void VM::ret_op ()
 {
         int32_t ret_addr = pop ();
 
-        vm.bp = vm.stack_frames[--vm.frame_no];
-        vm.ip = vm.instructions + ret_addr;
+        this->bp = this->stack_frames[--this->frame_no];
+        this->ip = this->instructions + ret_addr;
 }
 
-void run ()
+void VM::run ()
 {
         for (;;) {
                 switch (read_op ()) {
@@ -234,25 +230,25 @@ _halt:
         return;
 }
 
-int initialize_and_run (int8_t *code, size_t code_size, int32_t entry_address)
+int VM::initialize_and_run (int8_t *code, size_t code_size, int32_t entry_address)
 {
         if (code_size > CODE_SIZE)
                 return -1;
 
         for (size_t i = 0; i < code_size; i++)
-                vm.instructions[i] = code[i];
+                this->instructions[i] = code[i];
 
-        vm.sp = vm.stack;
-        vm.bp = vm.stack;
-        vm.ip = vm.instructions + entry_address;
-        vm.frame_no = 0;
+        this->sp = this->stack;
+        this->bp = this->stack;
+        this->ip = this->instructions + entry_address;
+        this->frame_no = 0;
 
         run ();
 
         return 1;
 }
 
-int load_file_and_run (char *filename)
+int VM::load_file_and_run (char *filename)
 {
         FILE *fp = fopen (filename, "rb");
 
@@ -271,29 +267,7 @@ int load_file_and_run (char *filename)
         return initialize_and_run (code, fsize, 0);
 }
 
-void parse_cmd (int argc, char **argv)
+int VM::load_function_and_run (Function *f)
 {
-        struct option long_opts[] = {
-                {"debug", no_argument, 0, '-d'}
-        };
-        int opt_idx, c;
-        while ((c = getopt_long (argc, argv, "", long_opts, &opt_idx)) != -1) {
-                switch (c) {
-                case 'd': break;
-                default: break;
-                }
-        }
-
-        if (optind == argc) {
-                fprintf (stderr, "error: no input files.");
-                exit (EXIT_FAILURE);
-        }
-
-        load_file_and_run (argv[optind]);
-}
-
-int main (int argc, char **argv)
-{
-        parse_cmd (argc, argv);
-        return 0;
+        return this->initialize_and_run (f->bytecode->chunk, f->bytecode->count, f->entry_address);
 }
