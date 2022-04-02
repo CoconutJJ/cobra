@@ -113,6 +113,14 @@ int Symbols::get_locals_count ()
         return this->locals_count;
 }
 
+int Symbols::get_all_locals_count() {
+
+        if (!this->prev_scope) return this->locals_count;
+
+        return this->locals_count + this->prev_scope->get_all_locals_count();
+
+}
+
 Symbols *Symbols::new_scope ()
 {
         this->next_scope = new Symbols (this, this->local_offset, this->scope_level + 1);

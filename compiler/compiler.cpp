@@ -113,6 +113,7 @@ void Compiler::setup (char *src_code)
         NONE_RULE (RBRACE);
         NONE_RULE (RPAREN);
         NONE_RULE (SEMICOLON);
+        NONE_RULE (RETURN);
 
 #undef NONE_RULE
 #undef RULE
@@ -215,6 +216,7 @@ void Compiler::parse_statement ()
         case WHILE: this->parse_while (); break;
         case FOR: this->parse_for (); break;
         case FUNC: this->parse_function_statement (); break;
+        case RETURN: this->parse_return (); break;
         default: this->parse_expression_statement (); break;
         }
 }
@@ -222,6 +224,7 @@ void Compiler::parse_statement ()
 void Compiler::parse_expression_statement ()
 {
         this->parse_expression ();
+        this->consume (SEMICOLON, "expected ; after expression");
 }
 
 void Compiler::parse_expression ()
@@ -245,7 +248,10 @@ void Compiler::parse_function_statement ()
 
         this->symbols->declare_function (func_name.name, func_name.len);
 
-        this->symbols = this->symbols->new_scope ();
+        Symbols symbols (NULL, 0, 1);
+        Symbols *old_symbols = this->symbols;
+
+        this->symbols = &symbols;
 
         struct token args_list[255];
         int args_idx = 0;
@@ -280,11 +286,12 @@ void Compiler::parse_function_statement ()
         while (var_count-- > 0) {
                 this->function->bytecode->emit_op (OPPOP);
         }
-
+        this->function->bytecode->emit_op (OPPUSH);
+        this->function->bytecode->write_int32 (0);
         this->function->bytecode->emit_op (OPRET);
         this->functions.push_back (this->function);
         this->function = old_function;
-        this->symbols = this->symbols->pop_scope ();
+        this->symbols = old_symbols;
 }
 
 Function *Compiler::find_function_by_name (char *func_name, size_t len)
@@ -450,6 +457,9 @@ void Compiler::consume (enum token_t t, const char *error_message, ...)
         if (this->match (t))
                 return;
 
+        if (this->curr_token.type == END)
+                this->curr_token = this->prev_token;
+
         va_list args;
         va_start (args, error_message);
         fprintf (stderr, "[error on line %lu:%lu] ", this->curr_token.line, this->curr_token.col);
@@ -467,7 +477,7 @@ void Compiler::parse_error (const char *error, struct token t, ...)
         va_start (args, t);
         fprintf (stderr, "[error on line %lu:%lu] ", t.line, t.col);
         vfprintf (stderr, error, args);
-        fputc('\n', stderr);
+        fputc ('\n', stderr);
         va_end (args);
         this->highlight_line (t);
 }
@@ -641,6 +651,23 @@ void Compiler::parse_for ()
         this->function->bytecode->patch_jump (condition_false_offset);
 }
 
+void Compiler::parse_return ()
+{
+        this->consume (RETURN, "expected return statmeent");
+
+        int total = this->symbols->get_all_locals_count ();
+
+        for (; total > 0; total--) {
+                this->function->bytecode->emit_op (OPPOP);
+        }
+
+        if (this->match (SEMICOLON))
+                return;
+
+        this->parse_expression ();
+        this->function->bytecode->emit_op (OPRET);
+        this->consume (SEMICOLON, "expected ; after return statement");
+}
 std::string Compiler::convert_to_string (char *s, size_t len)
 {
         char buf[len + 1] = { '\0' };

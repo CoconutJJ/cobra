@@ -272,7 +272,7 @@ struct token Scanner::scan_token ()
                         } else {
                                 this->scan_error ("unexpected symbol '%c'\n", c);
                                 this->highlight_line (this->col_no - 1, this->col_no);
-                                continue;
+                                exit(EXIT_FAILURE);
                         }
 
                         break;

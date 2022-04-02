@@ -28,6 +28,8 @@ enum OpCode {
     OPPOP,
     OPCALL,
     OPHALT,
+    OPFORK,
+    OPKILL,
     OPRET
 };
 

@@ -25,6 +25,7 @@ class Symbols {
         bool variable_declared (char *variable_name, size_t len);
         bool function_declared (char *func_name, size_t len);
         int get_locals_count();
+        int get_all_locals_count();
         Symbols *new_scope ();
         Symbols *pop_scope ();
 

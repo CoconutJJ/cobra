@@ -1,12 +1,34 @@
 #ifndef vm_h
 #define vm_h
-#include "function.h"
 #include "bytecode.h"
+#include "function.h"
 #include <stdint.h>
 
-#define STACK_SIZE 1024
-#define FRAME_SIZE 1024
-#define CODE_SIZE  1024
+#define STACK_SIZE  1024
+#define FRAME_SIZE  1024
+#define CODE_SIZE   1024
+#define MAX_THREADS 10
+
+enum thread_state {
+    RUNNING,
+    BLOCKED,
+    KILLED,
+    EXITED,
+    UNUSED
+};
+
+struct context {
+        int8_t *ip;
+        int8_t instructions[CODE_SIZE];
+        int32_t *sp;
+        int32_t *bp;
+        int32_t stack[STACK_SIZE];
+        int32_t frame_no;
+        int32_t *stack_frames[FRAME_SIZE];
+        enum thread_state state;
+};
+
+
 
 class VM {
     public:
@@ -15,16 +37,12 @@ class VM {
         int load_function_and_run (Function *f);
 
     private:
-        int8_t *ip;
-        int8_t instructions[CODE_SIZE];
-        int32_t *sp;
-        int32_t *bp;
-        int32_t stack[STACK_SIZE];
-        int32_t frame_no;
-        int32_t *stack_frames[FRAME_SIZE];
+        struct context *thread;
+
+        struct context threads[MAX_THREADS];
 
         void assert_valid_stack_location (const char *prefix, void *ptr);
-
+        void assert_valid_ip(int8_t *ip);
         int32_t read_int32 ();
         enum OpCode read_op ();
 
@@ -48,7 +66,13 @@ class VM {
         void load_op ();
         void call_op ();
         void ret_op ();
+        void halt_op ();
+        void fork_op ();
+        void kill_op();
 
+        struct context *allocate_thread ();
+        void schedule ();
+        void execute_instruction ();
         void run ();
         int initialize_and_run (int8_t *code, size_t code_size, int32_t entry_address);
 };

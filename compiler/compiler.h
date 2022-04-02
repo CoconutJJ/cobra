@@ -105,6 +105,7 @@ class Compiler {
         void parse_products ();
         void parse_comparison ();
         void parse_logical ();
+        void parse_return();
 };
 
 #endif
