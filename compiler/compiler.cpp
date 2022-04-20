@@ -386,9 +386,20 @@ void Compiler::parse_primary ()
                         this->function->bytecode->emit_op (OPCALL);
                         this->function->bytecode->write_int32 (
                                 this->resolve_function_placeholder (token.name, token.len));
-                        while (param_count-- > 0) {
+
+                        // the function return value is sitting on top of all the function arguments,
+                        // since we need to clear these arguments after the function returns
+                        // we overwrite the lowest function argument with the return value
+                        // and adjust the number of POP's we do for cleanup
+                        this->function->bytecode->emit_op (OPSTORE);
+                        this->function->bytecode->write_int32 (this->symbols->get_next_local_offset ());
+
+                        // keep the return value on the stack
+                        param_count--;
+
+                        while (param_count-- > 0)
                                 this->function->bytecode->emit_op (OPPOP);
-                        }
+
                 } else {
                         this->function->bytecode->emit_op (OPLOAD);
                         this->function->bytecode->write_int32 (offset);
@@ -653,20 +664,36 @@ void Compiler::parse_for ()
 
 void Compiler::parse_return ()
 {
-        this->consume (RETURN, "expected return statmeent");
+        this->consume (RETURN, "expected return statement");
 
         int total = this->symbols->get_all_locals_count ();
 
-        for (; total > 0; total--) {
-                this->function->bytecode->emit_op (OPPOP);
+        if (this->match (SEMICOLON)) {
+                for (; total > 0; total--) {
+                        this->function->bytecode->emit_op (OPPOP);
+                }
+
+                this->function->bytecode->emit_op (OPPUSH);
+                this->function->bytecode->write_int32 (0);
+        } else {
+                this->parse_expression ();
+                this->consume (SEMICOLON, "expected ; after return statement");
+
+                if (total != 0) {
+                        // write the return value to the bottom of the stack frame
+                        this->function->bytecode->emit_op (OPSTORE);
+                        this->function->bytecode->write_int32 (0);
+
+                        // pop everything except the bottom value
+                        total--;
+                        for (; total > 0; total--) {
+                                this->function->bytecode->emit_op (OPPOP);
+                        }
+                }
         }
 
-        if (this->match (SEMICOLON))
-                return;
-
-        this->parse_expression ();
         this->function->bytecode->emit_op (OPRET);
-        this->consume (SEMICOLON, "expected ; after return statement");
+        return;
 }
 std::string Compiler::convert_to_string (char *s, size_t len)
 {

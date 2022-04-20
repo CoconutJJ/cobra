@@ -205,9 +205,7 @@ void VM::load_op ()
         int32_t offset = read_int32 ();
 
         int32_t *load_location = this->thread->bp + offset;
-
         assert_valid_stack_location ("load: attempted to load with invalid VM configuration", load_location);
-
         push (*load_location);
 }
 
@@ -215,9 +213,32 @@ void VM::call_op ()
 {
         int32_t addr = read_int32 ();
         push (this->thread->ip - this->thread->instructions);
+
+        if (this->thread->frame_no == FRAME_SIZE) {
+                fprintf (stderr, "call: maximum recursion depth exceeded\n");
+                this->thread->state = KILLED;
+                return;
+        }
+
         this->thread->stack_frames[this->thread->frame_no++] = this->thread->bp;
         this->thread->bp = this->thread->sp;
         this->thread->ip = this->thread->instructions + addr;
+}
+
+void VM::swap_op ()
+{
+        int32_t a = read_int32 ();
+        int32_t b = read_int32 ();
+
+        int32_t *location_a = this->thread->bp + a;
+        int32_t *location_b = this->thread->bp + b;
+
+        assert_valid_stack_location ("swap: invalid swap location pair", location_a);
+        assert_valid_stack_location ("swap: invalid swap location pair", location_b);
+
+        int32_t temp = *location_a;
+        *location_a = *location_b;
+        *location_b = temp;
 }
 
 void VM::ret_op ()
@@ -246,7 +267,7 @@ void VM::fork_op ()
 
         size_t used_stack_size = (this->thread->sp - this->thread->stack) * sizeof (int32_t);
 
-        memcpy (new_thread->instructions, this->thread->instructions, CODE_SIZE * sizeof (uint8_t));
+        memcpy (new_thread->instructions, this->thread->instructions, CODE_SIZE * sizeof (int8_t));
 
         memcpy (new_thread->stack, this->thread->stack, used_stack_size);
 
@@ -265,14 +286,14 @@ void VM::fork_op ()
         this->thread = old_thread;
 }
 
-void VM::kill_op() {
-        int32_t thread_id = this->pop();
+void VM::kill_op ()
+{
+        int32_t thread_id = this->pop ();
 
         struct context *victim_thread = &this->threads[thread_id];
 
         victim_thread->state = KILLED;
 }
-
 
 struct context *VM::allocate_thread ()
 {
@@ -327,13 +348,14 @@ void VM::execute_instruction ()
         case OPHALT: halt_op (); break;
         case OPCALL: call_op (); break;
         case OPFORK: fork_op (); break;
-        case OPKILL: kill_op(); break;
+        case OPKILL: kill_op (); break;
         case OPRET: ret_op (); break;
         default:
                 fprintf (stderr, "illegal instruction: 0x%x\n", op);
-                goto _halt;
+                this->thread->state = KILLED;
                 break;
         }
+
 _halt:
         return;
 }

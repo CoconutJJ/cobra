@@ -69,7 +69,8 @@ class VM {
         void halt_op ();
         void fork_op ();
         void kill_op();
-
+        void swap_op();
+        
         struct context *allocate_thread ();
         void schedule ();
         void execute_instruction ();

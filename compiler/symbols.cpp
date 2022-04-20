@@ -93,6 +93,11 @@ bool Symbols::function_declared (char *func_name, size_t len)
         return this->prev_scope->function_declared (func_name, len);
 }
 
+int32_t Symbols::get_next_local_offset() {
+
+        return this->local_offset;
+
+}
 
 bool Symbols::has_function (char *func_name, size_t len)
 {
