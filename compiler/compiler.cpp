@@ -33,6 +33,9 @@ Compiler::Compiler (FILE *source_fp)
 
 Compiler::~Compiler ()
 {
+        delete this->scanner;
+        delete this->function;
+        delete this->symbols;
 }
 
 void Compiler::setup (char *src_code)
@@ -87,6 +90,8 @@ void Compiler::setup (char *src_code)
         RULE (GT, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
         RULE (GTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
 
+        RULE (EQUAL_EQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+
         RULE (EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
 
         RULE (PLUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
@@ -114,6 +119,7 @@ void Compiler::setup (char *src_code)
         NONE_RULE (RPAREN);
         NONE_RULE (SEMICOLON);
         NONE_RULE (RETURN);
+        NONE_RULE (COMMA);
 
 #undef NONE_RULE
 #undef RULE
@@ -515,7 +521,8 @@ void Compiler::parse_comparison ()
 {
         enum token_t op = this->peek ();
         struct token op_token = this->peek_token ();
-        if (!this->match (GT) && !this->match (GTEQUAL) && !this->match (LT) && !this->match (LTEQUAL)) {
+        if (!this->match (GT) && !this->match (GTEQUAL) && !this->match (LT) && !this->match (LTEQUAL) &&
+            !this->match (EQUAL_EQUAL)) {
                 this->parse_error ("expected >, >=, <=, < after lvalue", op_token);
                 return;
         }
@@ -527,6 +534,7 @@ void Compiler::parse_comparison ()
         case GTEQUAL: this->function->bytecode->emit_op (OPGTEQ); break;
         case LT: this->function->bytecode->emit_op (OPLT); break;
         case LTEQUAL: this->function->bytecode->emit_op (OPLTEQ); break;
+        case EQUAL_EQUAL: this->function->bytecode->emit_op (OPEQ); break;
         default: break;
         }
 }

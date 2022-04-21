@@ -7,10 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define STACK_SIZE 1024
-#define FRAME_SIZE 1024
-#define CODE_SIZE  1024
-
 VM::VM ()
 {
         for (int i = 0; i < MAX_THREADS; i++) {
@@ -20,6 +16,7 @@ VM::VM ()
         this->thread->ip = NULL;
         this->thread->bp = NULL;
         this->thread->frame_no = 0;
+        this->thread->op_count = 0;
 }
 
 void VM::assert_valid_ip (int8_t *ip)
@@ -41,7 +38,7 @@ void VM::assert_valid_ip (int8_t *ip)
 
 void VM::assert_valid_stack_location (const char *prefix, void *ptr)
 {
-        if (ptr > this->thread->sp) {
+        if (ptr >= this->thread->stack + STACK_SIZE) {
                 fprintf (stderr, "error: stack overflow: %s\n", prefix);
                 exit (EXIT_FAILURE);
         } else if (ptr < this->thread->stack) {
@@ -87,91 +84,31 @@ void VM::push (int32_t v)
                                            this->thread->sp);
 }
 
-void VM::add_op ()
+void VM::bin_op (enum OpCode op)
 {
-        push (pop () + pop ());
+        int32_t b = this->pop ();
+        int32_t a = this->pop ();
+        int32_t c;
+        switch (op) {
+        case OPADD: c = a + b; break;
+        case OPMULT: c = a * b; break;
+        case OPDIV: c = a / b; break;
+        case OPMOD: c = a % b; break;
+        case OPEQ: c = (a == b); break;
+        case OPGT: c = (a > b); break;
+        case OPGTEQ: c = (a >= b); break;
+        case OPLT: c = (a < b); break;
+        case OPLTEQ: c = (a <= b); break;
+        case OPAND: c = (a && b); break;
+        case OPOR: c = (a || b); break;
+        default: exit (EXIT_FAILURE); break;
+        }
+        this->push (c);
 }
 
 void VM::neg_op ()
 {
         push (-pop ());
-}
-
-void VM::mult_op ()
-{
-        push (pop () * pop ());
-}
-
-void VM::div_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a / b);
-}
-
-void VM::mod_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a % b);
-}
-
-void VM::eq_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a == b);
-}
-
-void VM::gt_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a > b);
-}
-
-void VM::lt_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a < b);
-}
-
-void VM::gteq_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a >= b);
-}
-
-void VM::lteq_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a <= b);
-}
-
-void VM::and_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a && b);
-}
-
-void VM::or_op ()
-{
-        int32_t b = pop ();
-        int32_t a = pop ();
-
-        push (a || b);
 }
 
 void VM::jmp_op ()
@@ -254,6 +191,7 @@ void VM::ret_op ()
 void VM::halt_op ()
 {
         this->thread->state = EXITED;
+        this->display_thread_info (this->thread);
 }
 
 void VM::fork_op ()
@@ -271,9 +209,8 @@ void VM::fork_op ()
 
         memcpy (new_thread->stack, this->thread->stack, used_stack_size);
 
-        for (int i = 0; i < this->thread->frame_no; i++) {
+        for (int i = 0; i < this->thread->frame_no; i++)
                 new_thread->stack_frames[i] = new_thread->stack + (this->thread->stack_frames[i] - this->thread->stack);
-        }
 
         new_thread->ip = new_thread->instructions + (this->thread->ip - this->thread->instructions);
         new_thread->bp = new_thread->stack + (this->thread->bp - this->thread->stack);
@@ -293,6 +230,22 @@ void VM::kill_op ()
         struct context *victim_thread = &this->threads[thread_id];
 
         victim_thread->state = KILLED;
+
+        this->display_thread_info (victim_thread);
+}
+
+void VM::display_thread_info (struct context *thread)
+{
+        int thread_id = thread - this->threads;
+
+        switch (thread->state) {
+        case EXITED: printf ("Thread #%d exited normally\n", thread_id); break;
+        case KILLED: printf ("Thread #%d was killed\n", thread_id); break;
+        case RUNNING: printf ("Thread #%d is running\n", thread_id); break;
+        default: break;
+        }
+
+        printf ("Opcodes executed: %lu\n", thread->op_count);
 }
 
 struct context *VM::allocate_thread ()
@@ -324,39 +277,33 @@ void VM::schedule ()
 }
 void VM::execute_instruction ()
 {
-        enum OpCode op;
+        enum OpCode op = read_op ();
 
-        switch ((op = read_op ())) {
-        case OPADD: add_op (); break;
-        case OPNEG: neg_op (); break;
-        case OPMULT: mult_op (); break;
-        case OPDIV: div_op (); break;
-        case OPMOD: mod_op (); break;
-        case OPEQ: eq_op (); break;
-        case OPGT: gt_op (); break;
-        case OPLT: lt_op (); break;
-        case OPGTEQ: gteq_op (); break;
-        case OPLTEQ: lteq_op (); break;
-        case OPAND: and_op (); break;
-        case OPOR: or_op (); break;
-        case OPJMP: jmp_op (); break;
-        case OPJMPFALSE: jmpfalse_op (); break;
-        case OPSTORE: store_op (); break;
-        case OPLOAD: load_op (); break;
-        case OPPUSH: push (read_int32 ()); break;
-        case OPPOP: pop (); break;
-        case OPHALT: halt_op (); break;
-        case OPCALL: call_op (); break;
-        case OPFORK: fork_op (); break;
-        case OPKILL: kill_op (); break;
-        case OPRET: ret_op (); break;
-        default:
-                fprintf (stderr, "illegal instruction: 0x%x\n", op);
-                this->thread->state = KILLED;
-                break;
+        if (OPADD <= op && op <= OPOR) {
+                bin_op (op);
+        } else {
+                switch (op) {
+                case OPNEG: neg_op (); break;
+                case OPJMP: jmp_op (); break;
+                case OPJMPFALSE: jmpfalse_op (); break;
+                case OPSTORE: store_op (); break;
+                case OPLOAD: load_op (); break;
+                case OPPUSH: push (read_int32 ()); break;
+                case OPPOP: pop (); break;
+                case OPHALT: halt_op (); break;
+                case OPCALL: call_op (); break;
+                case OPFORK: fork_op (); break;
+                case OPKILL: kill_op (); break;
+                case OPRET: ret_op (); break;
+                default:
+                        fprintf (stderr, "illegal instruction: 0x%x\n", op);
+                        this->thread->state = KILLED;
+                        break;
+                }
         }
 
-_halt:
+        this->thread->op_count++;
+
         return;
 }
 
@@ -381,6 +328,7 @@ int VM::initialize_and_run (int8_t *code, size_t code_size, int32_t entry_addres
         this->thread->ip = this->thread->instructions + entry_address;
         this->thread->frame_no = 0;
         this->thread->state = RUNNING;
+        this->thread->op_count = 0;
         run ();
 
         return 1;
@@ -389,6 +337,11 @@ int VM::initialize_and_run (int8_t *code, size_t code_size, int32_t entry_addres
 int VM::load_file_and_run (char *filename)
 {
         FILE *fp = fopen (filename, "rb");
+
+        if (!fp) {
+                perror ("fopen");
+                exit (EXIT_FAILURE);
+        }
 
         fseek (fp, 0, SEEK_END);
 
