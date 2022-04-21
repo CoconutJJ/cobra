@@ -55,6 +55,11 @@ bool Symbols::declare_function_parameter (char *variable_name, size_t len)
         return true;
 }
 
+int32_t Symbols::get_function_parameter_n_offset(int32_t n) {
+
+        return n + this->param_offset;
+}
+
 std::string Symbols::convert_to_string (char *str, size_t len)
 {
         char *buf = (char *)malloc ((len + 1) * sizeof (char));

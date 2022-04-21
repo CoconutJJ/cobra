@@ -19,6 +19,7 @@ class Symbols {
         int32_t get_stack_offset (char *variable_name, size_t len);
         bool declare_local_variable (char *variable_name, size_t len);
         bool declare_function_parameter (char *parameter_name, size_t len);
+        int32_t get_function_parameter_n_offset(int32_t n);
         bool declare_function (char * func_name, size_t len);
         bool has_function (char *func_name, size_t len);
         bool has_variable (char *symbol, size_t len);

@@ -214,6 +214,7 @@ const char *Bytecode::get_op_name (enum OpCode op)
         switch (op) {
         case OPADD: return "OPADD";
         case OPNEG: return "OPNEG";
+        case OPNOT: return "OPNOT";
         case OPMULT: return "OPMULT";
         case OPDIV: return "OPDIV";
         case OPMOD: return "OPMOD";
@@ -233,6 +234,7 @@ const char *Bytecode::get_op_name (enum OpCode op)
         case OPCALL: return "OPCALL";
         case OPHALT: return "OPHALT";
         case OPFORK: return "OPFORK";
+        case OPKILL: return "OPKILL";
         case OPRET: return "OPRET";
         default: return "UNKNOWN_OP";
         }

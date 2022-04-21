@@ -7,7 +7,7 @@
 #define STACK_SIZE  (1024 * 3)
 #define FRAME_SIZE  (1024 * 3)
 #define CODE_SIZE   (1024 * 3)
-#define MAX_THREADS 1
+#define MAX_THREADS 10
 
 enum thread_state { RUNNING, BLOCKED, KILLED, EXITED, UNUSED };
 
@@ -44,7 +44,7 @@ class VM {
 
         void bin_op (enum OpCode op);
         void neg_op ();
-
+        void not_op ();
         void jmp_op ();
         void jmpfalse_op ();
         void store_op ();

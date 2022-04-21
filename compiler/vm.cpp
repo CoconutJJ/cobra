@@ -111,6 +111,11 @@ void VM::neg_op ()
         push (-pop ());
 }
 
+void VM::not_op ()
+{
+        push (1 - pop ());
+}
+
 void VM::jmp_op ()
 {
         int32_t addr = read_int32 ();
@@ -135,6 +140,10 @@ void VM::store_op ()
         assert_valid_stack_location ("store: attempted to store with invalid VM configuration", store_location);
 
         *store_location = value;
+
+        if (store_location >= this->thread->sp) {
+                this->thread->sp = store_location + 1;
+        }
 }
 
 void VM::load_op ()
@@ -215,12 +224,18 @@ void VM::fork_op ()
         new_thread->ip = new_thread->instructions + (this->thread->ip - this->thread->instructions);
         new_thread->bp = new_thread->stack + (this->thread->bp - this->thread->stack);
         new_thread->sp = new_thread->stack + (this->thread->sp - this->thread->stack);
+        new_thread->op_count = this->thread->op_count;
+        new_thread->state = RUNNING;
 
         this->push (new_thread - this->threads);
         struct context *old_thread = this->thread;
         this->thread = new_thread;
         this->push (0);
         this->thread = old_thread;
+
+        printf("New thread was created...\n");
+        this->display_thread_info(new_thread);
+
 }
 
 void VM::kill_op ()
@@ -229,7 +244,12 @@ void VM::kill_op ()
 
         struct context *victim_thread = &this->threads[thread_id];
 
-        victim_thread->state = KILLED;
+        if (victim_thread->state == RUNNING) {
+                victim_thread->state = KILLED;
+                this->push (1);
+        } else {
+                this->push (0);
+        }
 
         this->display_thread_info (victim_thread);
 }
@@ -253,8 +273,15 @@ struct context *VM::allocate_thread ()
         for (int curr = 0; curr < MAX_THREADS; curr++) {
                 struct context *free_thread = &this->threads[curr];
 
-                if (free_thread->state == UNUSED)
+                switch (free_thread->state) {
+                case UNUSED:
+                case KILLED:
+                case EXITED: {
+                        free_thread->op_count = 0;
                         return free_thread;
+                }
+                default: continue;
+                }
         }
 
         return NULL;
@@ -283,6 +310,7 @@ void VM::execute_instruction ()
                 bin_op (op);
         } else {
                 switch (op) {
+                case OPNOT: not_op (); break;
                 case OPNEG: neg_op (); break;
                 case OPJMP: jmp_op (); break;
                 case OPJMPFALSE: jmpfalse_op (); break;

@@ -78,6 +78,9 @@ class Compiler {
 
         void variable_check_before_assignment (char *variable_name, size_t len, struct token token, struct token assign_op);
         Function *find_function_by_name(char *func_name, size_t len);
+
+        void resolve_call_statement(char *func_name, size_t len);
+
         void parse_statement ();
 
         void parse_condition ();

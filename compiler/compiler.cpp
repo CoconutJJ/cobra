@@ -91,9 +91,9 @@ void Compiler::setup (char *src_code)
         RULE (GTEQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
 
         RULE (EQUAL_EQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
+        RULE (BANG_EQUAL, &Compiler::parse_comparison, PREC_COMPARISON, NULL, PREC_NONE);
 
         RULE (EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
-
         RULE (PLUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
         RULE (MINUS_EQUAL, NULL, PREC_ASSIGNMENT, NULL, PREC_ASSIGNMENT);
 
@@ -327,6 +327,31 @@ void Compiler::variable_check_before_assignment (char *variable_name,
         }
 }
 
+void Compiler::resolve_call_statement (char *func_name, size_t len)
+{
+#define MAX(a, b) ((a) < (b) ? (b) : (a))
+
+        if (strncmp (func_name, "fork", MAX (4, len)) == 0) {
+                this->function->bytecode->emit_op (OPFORK);
+                return;
+        }
+
+        if (strncmp (func_name, "kill", MAX (4, len)) == 0) {
+                this->function->bytecode->emit_op (OPKILL);
+                return;
+        }
+
+        if (strncmp (func_name, "exit", MAX (4, len)) == 0) {
+                this->function->bytecode->emit_op (OPHALT);
+                return;
+        }
+
+#undef MAX
+
+        this->function->bytecode->emit_op (OPCALL);
+        this->function->bytecode->write_int32 (this->resolve_function_placeholder (func_name, len));
+}
+
 void Compiler::parse_primary ()
 {
         struct token token = this->peek_token ();
@@ -389,9 +414,7 @@ void Compiler::parse_primary ()
                                 return;
                         }
 
-                        this->function->bytecode->emit_op (OPCALL);
-                        this->function->bytecode->write_int32 (
-                                this->resolve_function_placeholder (token.name, token.len));
+                        this->resolve_call_statement (token.name, token.len);
 
                         // the function return value is sitting on top of all the function arguments,
                         // since we need to clear these arguments after the function returns
@@ -521,12 +544,8 @@ void Compiler::parse_comparison ()
 {
         enum token_t op = this->peek ();
         struct token op_token = this->peek_token ();
-        if (!this->match (GT) && !this->match (GTEQUAL) && !this->match (LT) && !this->match (LTEQUAL) &&
-            !this->match (EQUAL_EQUAL)) {
-                this->parse_error ("expected >, >=, <=, < after lvalue", op_token);
-                return;
-        }
 
+        this->advance ();
         this->parse_precedence (PRECEDENCE_GREATER_THAN (this->previous ()));
 
         switch (op) {
@@ -535,7 +554,12 @@ void Compiler::parse_comparison ()
         case LT: this->function->bytecode->emit_op (OPLT); break;
         case LTEQUAL: this->function->bytecode->emit_op (OPLTEQ); break;
         case EQUAL_EQUAL: this->function->bytecode->emit_op (OPEQ); break;
-        default: break;
+        case BANG_EQUAL: {
+                this->function->bytecode->emit_op (OPEQ);
+                this->function->bytecode->emit_op (OPNOT);
+                break;
+        }
+        default: this->parse_error ("expected ==, !=, >, >=, <=, < after lvalue", op_token); break;
         }
 }
 

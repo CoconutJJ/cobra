@@ -79,18 +79,22 @@ bool Scanner::is_valid_identifier_char (char c)
 
 enum token_t Scanner::match_keyword (char *keyword, int length)
 {
-        if (strncmp (keyword, "if", 2) == 0)
+#define MAX(a, b) ((a) < (b) ? (b) : (a))
+
+        if (strncmp (keyword, "if", MAX (2, length)) == 0)
                 return IF;
-        if (strncmp (keyword, "else", 4) == 0)
+        if (strncmp (keyword, "else", MAX (4, length)) == 0)
                 return ELSE;
-        if (strncmp (keyword, "while", 5) == 0)
+        if (strncmp (keyword, "while", MAX (5, length)) == 0)
                 return WHILE;
-        if (strncmp (keyword, "for", 3) == 0)
+        if (strncmp (keyword, "for", MAX (3, length)) == 0)
                 return FOR;
-        if (strncmp (keyword, "return", 6) == 0)
+        if (strncmp (keyword, "return", MAX (6, length)) == 0)
                 return RETURN;
-        if (strncmp (keyword, "func", 4) == 0)
+        if (strncmp (keyword, "func", MAX (4, length)) == 0)
                 return FUNC;
+
+#undef MAX
 
         return IDENTIFIER;
 }
@@ -272,7 +276,7 @@ struct token Scanner::scan_token ()
                         } else {
                                 this->scan_error ("unexpected symbol '%c'\n", c);
                                 this->highlight_line (this->col_no - 1, this->col_no);
-                                exit(EXIT_FAILURE);
+                                exit (EXIT_FAILURE);
                         }
 
                         break;

@@ -23,6 +23,7 @@ enum OpCode {
         /* end binary operations */
 
         OPNEG,
+        OPNOT,
         OPJMP,
         OPJMPFALSE,
         OPSTORE,
