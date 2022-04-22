@@ -327,29 +327,37 @@ void Compiler::variable_check_before_assignment (char *variable_name,
         }
 }
 
-void Compiler::resolve_call_statement (char *func_name, size_t len)
+void Compiler::resolve_call_statement (char *func_name, size_t len, int param_count)
 {
 #define MAX(a, b) ((a) < (b) ? (b) : (a))
 
         if (strncmp (func_name, "fork", MAX (4, len)) == 0) {
                 this->function->bytecode->emit_op (OPFORK);
-                return;
-        }
-
-        if (strncmp (func_name, "kill", MAX (4, len)) == 0) {
+                this->function->bytecode->emit_op (OPSTORE);
+                this->function->bytecode->write_int32 (this->symbols->get_next_local_offset ());
+                param_count--;
+        } else if (strncmp (func_name, "kill", MAX (4, len)) == 0) {
                 this->function->bytecode->emit_op (OPKILL);
-                return;
-        }
-
-        if (strncmp (func_name, "exit", MAX (4, len)) == 0) {
+                this->function->bytecode->emit_op (OPSTORE);
+                this->function->bytecode->write_int32 (this->symbols->get_next_local_offset ());
+                param_count--;
+        } else if (strncmp (func_name, "exit", MAX (4, len)) == 0) {
                 this->function->bytecode->emit_op (OPHALT);
                 return;
+        } else if (strncmp (func_name, "print", MAX (5, len)) == 0) {
+                this->function->bytecode->emit_op (OPPRINT);
+                param_count--;
+        } else {
+                this->function->bytecode->emit_op (OPCALL);
+                this->function->bytecode->write_int32 (this->resolve_function_placeholder (func_name, len));
+                this->function->bytecode->emit_op (OPSTORE);
+                this->function->bytecode->write_int32 (this->symbols->get_next_local_offset ());
+                param_count--;
         }
 
+        while (param_count-- > 0)
+                this->function->bytecode->emit_op (OPPOP);
 #undef MAX
-
-        this->function->bytecode->emit_op (OPCALL);
-        this->function->bytecode->write_int32 (this->resolve_function_placeholder (func_name, len));
 }
 
 void Compiler::parse_primary ()
@@ -414,20 +422,7 @@ void Compiler::parse_primary ()
                                 return;
                         }
 
-                        this->resolve_call_statement (token.name, token.len);
-
-                        // the function return value is sitting on top of all the function arguments,
-                        // since we need to clear these arguments after the function returns
-                        // we overwrite the lowest function argument with the return value
-                        // and adjust the number of POP's we do for cleanup
-                        this->function->bytecode->emit_op (OPSTORE);
-                        this->function->bytecode->write_int32 (this->symbols->get_next_local_offset ());
-
-                        // keep the return value on the stack
-                        param_count--;
-
-                        while (param_count-- > 0)
-                                this->function->bytecode->emit_op (OPPOP);
+                        this->resolve_call_statement (token.name, token.len, param_count);
 
                 } else {
                         this->function->bytecode->emit_op (OPLOAD);
@@ -634,16 +629,15 @@ void Compiler::parse_condition ()
         // parse if body
         this->parse_statement ();
 
-        size_t offset_true = this->function->bytecode->emit_jump ();
-
-        this->function->bytecode->patch_jump (offset_false);
-
         // check if there is an else clause, parse if so..
         if (this->match (ELSE)) {
+                size_t offset_true = this->function->bytecode->emit_jump ();
+                this->function->bytecode->patch_jump (offset_false);
                 this->parse_statement ();
+                this->function->bytecode->patch_jump (offset_true);
+        } else {
+                this->function->bytecode->patch_jump(offset_false);
         }
-
-        this->function->bytecode->patch_jump (offset_true);
 }
 
 void Compiler::parse_while ()

@@ -235,6 +235,7 @@ const char *Bytecode::get_op_name (enum OpCode op)
         case OPHALT: return "OPHALT";
         case OPFORK: return "OPFORK";
         case OPKILL: return "OPKILL";
+        case OPPRINT: return "OPPRINT";
         case OPRET: return "OPRET";
         default: return "UNKNOWN_OP";
         }

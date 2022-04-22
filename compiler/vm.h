@@ -21,6 +21,8 @@ struct context {
         int32_t *stack_frames[FRAME_SIZE];
         uint64_t op_count;
         enum thread_state state;
+        struct context *next;
+        struct context *previous;
 };
 
 class VM {
@@ -28,6 +30,7 @@ class VM {
         VM ();
         int load_file_and_run (char *filename);
         int load_function_and_run (Function *f);
+        bool verbose;
 
     private:
         struct context *thread;
@@ -54,14 +57,18 @@ class VM {
         void halt_op ();
         void fork_op ();
         void kill_op ();
+        void print_op ();
         void swap_op ();
 
         struct context *allocate_thread ();
         void schedule ();
+        void add_thread(struct context *thread);
+        void remove_thread(struct context *thread);
         void execute_instruction ();
         void run ();
         int initialize_and_run (int8_t *code, size_t code_size, int32_t entry_address);
         void display_thread_info (struct context *thread);
+        void copy_thread_stats (struct context *src, struct context *dest);
 };
 
 #endif

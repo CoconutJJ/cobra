@@ -6,6 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define DEBUG_MODE        0
+#define EXEC_MODE         1
+#define VERBOSE           2
+#define SET_OPTION(opt)   (options |= (1 << (opt)))
+#define OPTION_ISSET(opt) (options & (1 << (opt)))
+int32_t options = 0;
+
 void compile (const char *filename, const char *outfile)
 {
         FILE *fp = fopen (filename, "r");
@@ -48,24 +55,32 @@ void exec (char *filename)
 {
         VM vm;
 
+        if (OPTION_ISSET (VERBOSE))
+                vm.verbose = true;
+
         vm.load_file_and_run (filename);
 }
 
 void parse_cmd (int argc, char **argv)
 {
         struct option long_options[] = {
-                {"debug",       no_argument, 0, 'd'},
-                { "exec", no_argument, 0, 'e'},
-                {   NULL,                 0, 0,   0}
+                {  "debug",       no_argument, 0, 'd'},
+                {   "exec",       no_argument, 0, 'e'},
+                {"verbose",       no_argument, 0, 'v'},
+                { "output", required_argument, 0, 'o'},
+                {     NULL,                 0, 0,   0}
         };
 
         int c, option_index = 0;
-        bool debug_mode = false, exec_mode = false;
 
-        while ((c = getopt_long (argc, argv, "", long_options, &option_index)) != -1) {
+        char *outfile_name = NULL;
+
+        while ((c = getopt_long (argc, argv, "devo:", long_options, &option_index)) != -1) {
                 switch (c) {
-                case 'd': debug_mode = true; break;
-                case 'e': exec_mode = true; break;
+                case 'd': SET_OPTION (DEBUG_MODE); break;
+                case 'e': SET_OPTION (EXEC_MODE); break;
+                case 'v': SET_OPTION (VERBOSE); break;
+                case 'o': outfile_name = optarg; break;
                 default: break;
                 }
         }
@@ -75,12 +90,12 @@ void parse_cmd (int argc, char **argv)
                 exit (EXIT_FAILURE);
         }
 
-        if (debug_mode)
+        if (OPTION_ISSET (DEBUG_MODE))
                 debug (argv[optind]);
-        else if (exec_mode)
+        else if (OPTION_ISSET (EXEC_MODE))
                 exec (argv[optind]);
         else
-                compile (argv[optind], "a.bin");
+                compile (argv[optind], outfile_name ? outfile_name : "a.bin");
 }
 
 int main (int argc, char **argv)

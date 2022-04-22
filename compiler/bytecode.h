@@ -32,6 +32,7 @@ enum OpCode {
         OPPOP,
         OPCALL,
         OPHALT,
+        OPPRINT,
         OPFORK,
         OPKILL,
         OPRET

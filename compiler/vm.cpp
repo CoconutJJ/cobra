@@ -17,6 +17,9 @@ VM::VM ()
         this->thread->bp = NULL;
         this->thread->frame_no = 0;
         this->thread->op_count = 0;
+        this->verbose = false;
+        this->thread->next = this->thread;
+        this->thread->previous = this->thread;
 }
 
 void VM::assert_valid_ip (int8_t *ip)
@@ -40,9 +43,12 @@ void VM::assert_valid_stack_location (const char *prefix, void *ptr)
 {
         if (ptr >= this->thread->stack + STACK_SIZE) {
                 fprintf (stderr, "error: stack overflow: %s\n", prefix);
+                fprintf (stderr, "ip: %ld", this->thread->ip - this->thread->instructions);
+
                 exit (EXIT_FAILURE);
         } else if (ptr < this->thread->stack) {
                 fprintf (stderr, "error: stack underflow: %s\n", prefix);
+                fprintf (stderr, "ip: %ld", this->thread->ip - this->thread->instructions);
                 exit (EXIT_FAILURE);
         }
 }
@@ -212,40 +218,31 @@ void VM::fork_op ()
                 return;
         }
 
-        size_t used_stack_size = (this->thread->sp - this->thread->stack) * sizeof (int32_t);
+        this->copy_thread_stats (this->thread, new_thread);
 
-        memcpy (new_thread->instructions, this->thread->instructions, CODE_SIZE * sizeof (int8_t));
-
-        memcpy (new_thread->stack, this->thread->stack, used_stack_size);
-
-        for (int i = 0; i < this->thread->frame_no; i++)
-                new_thread->stack_frames[i] = new_thread->stack + (this->thread->stack_frames[i] - this->thread->stack);
-
-        new_thread->ip = new_thread->instructions + (this->thread->ip - this->thread->instructions);
-        new_thread->bp = new_thread->stack + (this->thread->bp - this->thread->stack);
-        new_thread->sp = new_thread->stack + (this->thread->sp - this->thread->stack);
-        new_thread->op_count = this->thread->op_count;
-        new_thread->state = RUNNING;
-
-        this->push (new_thread - this->threads);
+        this->push (new_thread - this->threads + 1);
         struct context *old_thread = this->thread;
         this->thread = new_thread;
         this->push (0);
         this->thread = old_thread;
 
-        printf("New thread was created...\n");
-        this->display_thread_info(new_thread);
+        this->add_thread (new_thread);
 
+        if (this->verbose)
+                printf ("New thread was created...\n");
+
+        this->display_thread_info (new_thread);
 }
 
 void VM::kill_op ()
 {
-        int32_t thread_id = this->pop ();
+        int32_t thread_id = this->pop () - 1;
 
         struct context *victim_thread = &this->threads[thread_id];
 
         if (victim_thread->state == RUNNING) {
                 victim_thread->state = KILLED;
+                this->remove_thread (victim_thread);
                 this->push (1);
         } else {
                 this->push (0);
@@ -254,8 +251,16 @@ void VM::kill_op ()
         this->display_thread_info (victim_thread);
 }
 
+void VM::print_op ()
+{
+        printf ("%d\n", this->pop ());
+}
+
 void VM::display_thread_info (struct context *thread)
 {
+        if (!this->verbose)
+                return;
+
         int thread_id = thread - this->threads;
 
         switch (thread->state) {
@@ -266,6 +271,23 @@ void VM::display_thread_info (struct context *thread)
         }
 
         printf ("Opcodes executed: %lu\n", thread->op_count);
+}
+
+void VM::copy_thread_stats (struct context *src, struct context *dest)
+{
+        dest->ip = dest->instructions + (src->ip - src->instructions);
+        dest->sp = dest->stack + (src->sp - src->stack);
+        dest->bp = dest->stack + (src->bp - src->stack);
+        dest->frame_no = src->frame_no;
+        dest->op_count = src->op_count;
+        dest->state = src->state;
+
+        size_t used_stack_size = (src->sp - src->stack) * sizeof (int32_t);
+        memcpy (dest->stack, src->stack, used_stack_size);
+        memcpy (dest->instructions, src->instructions, CODE_SIZE * sizeof (int8_t));
+
+        for (int i = 0; i < src->frame_no; i++)
+                dest->stack_frames[i] = dest->stack + (src->stack_frames[i] - src->stack);
 }
 
 struct context *VM::allocate_thread ()
@@ -287,20 +309,37 @@ struct context *VM::allocate_thread ()
         return NULL;
 }
 
+void VM::add_thread (struct context *thread)
+{
+        struct context *curr_next = this->thread->next;
+
+        this->thread->next = thread;
+        thread->previous = this->thread;
+
+        thread->next = curr_next;
+        curr_next->previous = thread;
+}
+
+void VM::remove_thread (struct context *thread)
+{
+        if (thread->previous == thread || thread->next == thread)
+                return;
+
+        struct context *left = thread->previous;
+        struct context *right = thread->next;
+
+        left->next = right;
+        right->previous = left;
+}
+
 void VM::schedule ()
 {
-        int index = this->thread - this->threads;
+        struct context *old_thread = this->thread;
 
-        int curr = (index + 1) % MAX_THREADS;
+        this->thread = this->thread->next;
 
-        while (curr != index) {
-                if (this->threads[curr].state == RUNNING) {
-                        this->thread = &this->threads[curr];
-                        break;
-                }
-
-                curr = (curr + 1) % MAX_THREADS;
-        }
+        if (old_thread->state != RUNNING)
+                this->remove_thread (old_thread);
 }
 void VM::execute_instruction ()
 {
@@ -321,6 +360,7 @@ void VM::execute_instruction ()
                 case OPHALT: halt_op (); break;
                 case OPCALL: call_op (); break;
                 case OPFORK: fork_op (); break;
+                case OPPRINT: print_op (); break;
                 case OPKILL: kill_op (); break;
                 case OPRET: ret_op (); break;
                 default:
