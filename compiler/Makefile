@@ -4,7 +4,7 @@ FLAGS=-Ofast -Wall
 
 all: cobrac clean
 debug: FLAGS=-Og -g -Wall
-debug: cobrac clean
+debug: cobrac
 cobrac: $(OBJ)
 	$(CC) $(FLAGS) $(OBJ) -o cobrac
 

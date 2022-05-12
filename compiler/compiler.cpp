@@ -47,6 +47,7 @@ void Compiler::setup (char *src_code)
                 .binary_prec = (bprec),                                                                                \
                 .unary_prec = (uprec)                                                                                  \
         }
+        
 #define NONE_RULE(token) RULE (token, NULL, PREC_NONE, NULL, PREC_NONE)
         /*
          * indicates whether an compilation error has occurred.
