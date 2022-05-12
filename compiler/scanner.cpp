@@ -261,6 +261,7 @@ struct token Scanner::scan_token ()
                         t.type = COMMA;
                         t.len = 1;
                         break;
+                case '\t':
                 case ' ': continue;
                 case '\n': {
                         this->line_no++;
